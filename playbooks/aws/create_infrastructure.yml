@@ -74,6 +74,11 @@
               - 27826
             cidr_ip: 0.0.0.0/0
             rule_desc: "Allow AAP Gateway"
+          - proto: tcp
+            ports:
+              - 8444
+            cidr_ip: 0.0.0.0/0
+            rule_desc: "Allow SSL proxy (nginx with LetsEncrypt)"
         rules_egress:
           - proto: all
             cidr_ip: 0.0.0.0/0
