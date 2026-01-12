@@ -96,6 +96,14 @@ export MCP_ALLOW_WRITE_OPERATIONS="false"
 # Custom Subnet CIDR (optional)
 # export SUBNET_CIDR="10.0.1.0/24"
 
+# Skip system package updates during pre-installation (default: false)
+# Set to "true" to skip dnf update during AAP installation
+# export SKIP_SYSTEM_UPDATE="false"
+
+# Bundle installation mode (default: true)
+# Set to "false" to skip bundle installation and use online installation
+# export BUNDLE_INSTALL="true"
+
 #=============================================================================
 # VERIFICATION
 #=============================================================================

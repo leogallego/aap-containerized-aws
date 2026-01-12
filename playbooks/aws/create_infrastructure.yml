@@ -79,6 +79,11 @@
               - 8444
             cidr_ip: 0.0.0.0/0
             rule_desc: "Allow SSL proxy (nginx with LetsEncrypt)"
+          - proto: tcp
+            ports:
+              - 8448
+            cidr_ip: 0.0.0.0/0
+            rule_desc: "Allow MCP Server"
         rules_egress:
           - proto: all
             cidr_ip: 0.0.0.0/0

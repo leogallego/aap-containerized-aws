@@ -94,6 +94,7 @@ export AAP_INCLUDE_CONTROLLER="true"
 export AAP_INCLUDE_EDA_CONTROLLER="false"
 export AAP_INCLUDE_AUTOMATION_HUB="false"
 export AAP_INCLUDE_LIGHTSPEED="false"
+export AAP_INCLUDE_MCP_SERVER="false"
 ```
 
 ### Ansible Lightspeed Configuration
@@ -112,6 +113,36 @@ export LIGHTSPEED_CHATBOT_MODEL_ID="your-model-id"
 ```
 
 **Note:** Lightspeed can be installed without chatbot configuration, but the intelligent assistant will not be functional until you provide credentials to either a model-as-a-service provider or your own deployed LLM.
+
+### Ansible MCP Server Configuration
+
+To enable the Ansible MCP (Model Context Protocol) server:
+
+```bash
+# Enable MCP Server
+export AAP_INCLUDE_MCP_SERVER="true"
+
+# Optional: Enable read-write operations (default is read-only)
+export MCP_ALLOW_WRITE_OPERATIONS="true"
+```
+
+**Features:**
+- MCP server provides programmatic access to Ansible functionality
+- Default mode is read-only for safety
+- Can be enabled independently or alongside Lightspeed
+- Supports both read-only and read-write operations
+
+### Advanced Configuration Options
+
+Additional optional configuration variables:
+
+```bash
+# Skip system package updates during installation (default: false)
+export SKIP_SYSTEM_UPDATE="true"
+
+# Bundle installation mode (default: true)
+# Set to false for online installation
+export BUNDLE_INSTALL="true"
 ```
 
 ## Access
