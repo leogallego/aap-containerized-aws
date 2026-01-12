@@ -33,6 +33,13 @@
 [automationgateway]
 {{ installer_fqdn_hostname }} ansible_connection=local
 
+{% if aap_include_mcp_server|bool %}
+# This section is for the Ansible MCP server host
+# -------------------------------------------------
+[ansiblemcp]
+{{ installer_fqdn_hostname }} ansible_connection=local
+{% endif %}
+
 # This section is for your AAP Execution host(s)
 # ------------------------------------------------
 #[execution_nodes]
@@ -51,6 +58,10 @@
 [all:vars]
 
 # Common variables needed for installation
+{% if bundle_install|default(true)|bool %}
+bundle_install=true
+bundle_dir={{ installer_directory }}/bundle
+{% endif %}
 postgresql_admin_username=postgres
 postgresql_admin_password={{ installer_admin_pw }}
 registry_username={{ registry_username }}
@@ -110,4 +121,10 @@ lightspeed_mcp_lightspeed_enabled={{ lightspeed_mcp_lightspeed_enabled }}
 # AAP Gateway - mandatory
 gateway_admin_password={{ installer_admin_pw }}
 gateway_pg_host={{ installer_fqdn_hostname }}
-gateway_pg_password={{ installer_admin_pw }} 
+gateway_pg_password={{ installer_admin_pw }}
+
+{% if aap_include_mcp_server|bool %}
+# Ansible MCP server permissions
+# To enable read-write access, set the "mcp_allow_write_operations" variable to "true"
+mcp_allow_write_operations={{ mcp_allow_write_operations | lower }}
+{% endif %} 

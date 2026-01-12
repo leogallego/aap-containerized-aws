@@ -37,6 +37,7 @@ export AAP_INCLUDE_CONTROLLER="true"        # Ansible Controller
 export AAP_INCLUDE_EDA_CONTROLLER="false"   # Event-Driven Ansible
 export AAP_INCLUDE_AUTOMATION_HUB="false"   # Automation Hub
 export AAP_INCLUDE_LIGHTSPEED="false"       # Ansible Lightspeed
+export AAP_INCLUDE_MCP_SERVER="false"       # Ansible MCP Server
 
 # Database Configuration (for production, consider external DB)
 export AAP_DATABASE_HOST="localhost"
@@ -64,6 +65,14 @@ export LIGHTSPEED_CHATBOT_MODEL_ID=""         # Your model ID
 # export LIGHTSPEED_ADMIN_EMAIL="admin@example.com"
 # export LIGHTSPEED_MCP_CONTROLLER_ENABLED="false"
 # export LIGHTSPEED_MCP_LIGHTSPEED_ENABLED="false"
+
+#=============================================================================
+# ANSIBLE MCP SERVER CONFIGURATION (if AAP_INCLUDE_MCP_SERVER="true")
+#=============================================================================
+
+# MCP Server Configuration (only applies if AAP_INCLUDE_MCP_SERVER=true)
+# Set to "true" to enable read-write operations, "false" for read-only (default)
+export MCP_ALLOW_WRITE_OPERATIONS="false"
 
 #=============================================================================
 # SETUP BUNDLE CONFIGURATION
@@ -101,6 +110,7 @@ echo "- Controller: ${AAP_INCLUDE_CONTROLLER}"
 echo "- EDA: ${AAP_INCLUDE_EDA_CONTROLLER}"
 echo "- Hub: ${AAP_INCLUDE_AUTOMATION_HUB}"
 echo "- Lightspeed: ${AAP_INCLUDE_LIGHTSPEED}"
+echo "- MCP Server: ${AAP_INCLUDE_MCP_SERVER}"
 echo ""
 echo "Red Hat Registry configured: $([ -n "${REDHAT_REGISTRY_USERNAME}" ] && echo "✓" || echo "✗")"
 echo "Admin password set: $([ -n "${INSTALLER_ADMIN_PASSWORD}" ] && echo "✓" || echo "✗")"

@@ -63,11 +63,22 @@ aap_include_automation_hub: >-
 aap_include_lightspeed: >-
   {{ lookup('env', 'AAP_INCLUDE_LIGHTSPEED') |
      default('false', true) | bool }}
+aap_include_mcp_server: >-
+  {{ lookup('env', 'AAP_INCLUDE_MCP_SERVER') |
+     default('false', true) | bool }}
+
+# MCP Server Configuration
+mcp_allow_write_operations: >-
+  {{ lookup('env', 'MCP_ALLOW_WRITE_OPERATIONS') |
+     default('false', true) | bool }}
 
 # Installation Options
 skip_system_update: >-
   {{ lookup('env', 'SKIP_SYSTEM_UPDATE') |
      default('false', true) | bool }}
+bundle_install: >-
+  {{ lookup('env', 'BUNDLE_INSTALL') |
+     default('true', true) | bool }}
 
 # AAP Installer Directory (where the extracted bundle is located)
 installer_directory: >-
