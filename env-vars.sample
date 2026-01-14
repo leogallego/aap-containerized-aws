@@ -105,6 +105,18 @@ export MCP_ALLOW_WRITE_OPERATIONS="false"
 # export BUNDLE_INSTALL="true"
 
 #=============================================================================
+# PRODUCT DEMOS CONTENT INSTALLATION
+#=============================================================================
+
+# Install Ansible Product Demos content (default: true)
+# Set to "false" to skip demo content installation
+export INSTALL_PRODUCT_DEMOS="true"
+
+# Product Demos Repository Configuration (optional)
+# export PRODUCT_DEMOS_REPO_URL="https://github.com/ansible/product-demos.git"
+# export PRODUCT_DEMOS_REPO_VERSION="main"
+
+#=============================================================================
 # VERIFICATION
 #=============================================================================
 
@@ -119,6 +131,7 @@ echo "- EDA: ${AAP_INCLUDE_EDA_CONTROLLER}"
 echo "- Hub: ${AAP_INCLUDE_AUTOMATION_HUB}"
 echo "- Lightspeed: ${AAP_INCLUDE_LIGHTSPEED}"
 echo "- MCP Server: ${AAP_INCLUDE_MCP_SERVER}"
+echo "- Install Product Demos: ${INSTALL_PRODUCT_DEMOS}"
 echo ""
 echo "Red Hat Registry configured: $([ -n "${REDHAT_REGISTRY_USERNAME}" ] && echo "✓" || echo "✗")"
 echo "Admin password set: $([ -n "${INSTALLER_ADMIN_PASSWORD}" ] && echo "✓" || echo "✗")"
@@ -127,4 +140,5 @@ echo "Next steps:"
 echo "1. Update this file with your actual values"
 echo "2. Place setup bundle in files/ directory"
 echo "3. Run: source env-vars.sh"
-echo "4. Run: ansible-playbook playbooks/deploy-aap.yml" 
+echo "4. Run: ansible-playbook playbooks/deploy-aap.yml (basic deployment)"
+echo "   OR: ansible-playbook playbooks/deploy-aap-with-content.yml (with demo content)" 

@@ -17,8 +17,12 @@ ansible-galaxy collection install -r requirements.yml
 # Place your AAP bundle in files/ directory:
 # files/ansible-automation-platform-containerized-setup-bundle-*.tar.gz
 
-# 4. Deploy everything
+# 4. Deploy everything (choose one)
+# Basic deployment (AAP only)
 ansible-playbook playbooks/deploy-aap.yml
+
+# Full deployment (AAP + demo content)
+ansible-playbook playbooks/deploy-aap-with-content.yml
 ```
 
 ## Prerequisites
@@ -49,29 +53,26 @@ aws-aap-container/
 
 ## Deployment Options
 
-### Option 1: Single Command (Recommended)
+### Full Deployment with Demo Content
+```bash
+ansible-playbook playbooks/deploy-aap-with-content.yml
+```
+
+### Basic AAP Deployment Only
 ```bash
 ansible-playbook playbooks/deploy-aap.yml
 ```
 
-### Option 2: Step by Step
+### Step by Step
 ```bash
 # Create AWS infrastructure
 ansible-playbook playbooks/aws/create_infrastructure.yml
 
 # Install AAP
 ansible-playbook playbooks/aap/install.yml
-```
 
-### Option 3: Individual Components
-```bash
-# AWS infrastructure only
-ansible-playbook playbooks/aws/create_infrastructure.yml
-
-# AAP components individually
-ansible-playbook playbooks/aap/pre-install.yml
-ansible-playbook playbooks/aap/install.yml
-ansible-playbook playbooks/aap/post-install.yml
+# Install demo content (optional)
+ansible-playbook playbooks/aap/install-content.yml
 ```
 
 ## Configuration
@@ -95,54 +96,36 @@ export AAP_INCLUDE_EDA_CONTROLLER="false"
 export AAP_INCLUDE_AUTOMATION_HUB="false"
 export AAP_INCLUDE_LIGHTSPEED="false"
 export AAP_INCLUDE_MCP_SERVER="false"
+
+# Optional - Demo content
+export INSTALL_PRODUCT_DEMOS="true"
 ```
 
 ### Ansible Lightspeed Configuration
 
-To enable Ansible Lightspeed with intelligent assistant, you can use a model-as-a-service provider or deploy your own LLM:
-
 ```bash
-# Enable Lightspeed
 export AAP_INCLUDE_LIGHTSPEED="true"
-
-# Required for chatbot functionality
-# For vLLM deployments, ensure URL ends with /v1
 export LIGHTSPEED_CHATBOT_MODEL_URL="http://your-llm-endpoint:8000/v1"
 export LIGHTSPEED_CHATBOT_MODEL_API_KEY="your-api-key"
 export LIGHTSPEED_CHATBOT_MODEL_ID="your-model-id"
 ```
 
-**Note:** Lightspeed can be installed without chatbot configuration, but the intelligent assistant will not be functional until you provide credentials to either a model-as-a-service provider or your own deployed LLM.
-
 ### Ansible MCP Server Configuration
 
-To enable the Ansible MCP (Model Context Protocol) server:
-
 ```bash
-# Enable MCP Server
 export AAP_INCLUDE_MCP_SERVER="true"
-
-# Optional: Enable read-write operations (default is read-only)
-export MCP_ALLOW_WRITE_OPERATIONS="true"
+export MCP_ALLOW_WRITE_OPERATIONS="true"  # Optional, default is read-only
 ```
 
-**Features:**
-- MCP server provides programmatic access to Ansible functionality
-- Default mode is read-only for safety
-- Can be enabled independently or alongside Lightspeed
-- Supports both read-only and read-write operations
-
-### Advanced Configuration Options
-
-Additional optional configuration variables:
+### Optional Configuration
 
 ```bash
-# Skip system package updates during installation (default: false)
-export SKIP_SYSTEM_UPDATE="true"
+# Demo content installation
+export INSTALL_PRODUCT_DEMOS="true"
 
-# Bundle installation mode (default: true)
-# Set to false for online installation
-export BUNDLE_INSTALL="true"
+# Advanced options
+export SKIP_SYSTEM_UPDATE="true"    # Skip system updates
+export BUNDLE_INSTALL="true"        # Use bundle install
 ```
 
 ## Access

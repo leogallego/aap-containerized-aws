@@ -1,0 +1,17 @@
+---
+- name: Display deployment start
+  hosts: localhost
+  tasks:
+    - name: Display deployment start
+      ansible.builtin.debug:
+        msg: "Starting complete AAP deployment with demo content on AWS..."
+
+- name: Create AWS Infrastructure
+  import_playbook: aws/create_infrastructure.yml
+
+- name: Install AAP
+  import_playbook: aap/install.yml
+
+- name: Install AAP Demo Content
+  import_playbook: aap/install-content.yml
+  when: install_product_demos | default(true) | bool

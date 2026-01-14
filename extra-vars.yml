@@ -109,3 +109,14 @@ lightspeed_mcp_controller_enabled: >-
 lightspeed_mcp_lightspeed_enabled: >-
   {{ lookup('env', 'LIGHTSPEED_MCP_LIGHTSPEED_ENABLED') |
      default('false', true) | bool }}
+
+### Product Demos Content Installation
+install_product_demos: >-
+  {{ lookup('env', 'INSTALL_PRODUCT_DEMOS') |
+     default('true', true) | bool }}
+product_demos_repo_url: >-
+  {{ lookup('env', 'PRODUCT_DEMOS_REPO_URL') |
+     default('https://github.com/ansible/product-demos.git', true) }}
+product_demos_repo_version: >-
+  {{ lookup('env', 'PRODUCT_DEMOS_REPO_VERSION') |
+     default('main', true) }}

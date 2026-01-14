@@ -1,0 +1,255 @@
+---
+- name: Install Ansible Product Demos Content into AAP
+  # Target hosts: Can run on localhost or aap_nodes based on inventory
+  # Use: -e "apd_target_host=localhost" or -e "apd_target_host=aap_nodes"
+  hosts: "{{ apd_target_host | default('localhost') }}"
+  gather_facts: false
+  vars_files:
+    - "{{ project_root | default(playbook_dir + '/../..') }}/extra-vars.yml"
+
+  vars:
+    # Product demos repository configuration
+    apd_repo_url: "https://github.com/ansible/product-demos.git"
+    apd_repo_dest: "/tmp/product-demos"
+    apd_repo_version: "main"
+    apd_cleanup: true
+
+    # AAP connection details (uses existing installation vars)
+    # When running on localhost, connects to remote AAP controller
+    # When running on aap_nodes, connects to localhost (same node)
+    apd_aap_hostname: >-
+      {%- if apd_target_host | default('localhost') == 'localhost' -%}
+      https://{{ hostvars['aap_controller']['ansible_host'] }}
+      {%- else -%}
+      https://localhost
+      {%- endif -%}
+    apd_aap_username: "admin"
+    apd_aap_password: "{{ installer_admin_pw }}"
+
+  run_once: true
+
+  tasks:
+    - name: Display content installation start
+      ansible.builtin.debug:
+        msg: |
+          ========================================================
+          INSTALLING ANSIBLE PRODUCT DEMOS CONTENT
+          ========================================================
+          Execution Mode: {{ 'Remote (from localhost)' if apd_target_host | default('localhost') == 'localhost' else 'Local (on AAP nodes)' }}
+          Target AAP: {{ apd_aap_hostname }}
+          Repository: {{ apd_repo_url }}
+          Branch: {{ apd_repo_version }}
+
+    - name: Wait for AAP to be fully ready
+      ansible.builtin.uri:
+        url: "{{ apd_aap_hostname }}/api/gateway/v1/ping/"
+        validate_certs: false
+        method: GET
+        status_code: 200
+        force_basic_auth: true
+        user: "{{ apd_aap_username }}"
+        password: "{{ apd_aap_password }}"
+      register: aap_ping
+      until: aap_ping.status == 200
+      retries: 30
+      delay: 10
+
+    - name: Remove existing product-demos directory
+      ansible.builtin.file:
+        path: "{{ apd_repo_dest }}"
+        state: absent
+
+    - name: Clone product-demos repository
+      ansible.builtin.git:
+        repo: "{{ apd_repo_url }}"
+        dest: "{{ apd_repo_dest }}"
+        version: "{{ apd_repo_version }}"
+        force: true
+      register: git_clone
+
+    - name: Display clone result
+      ansible.builtin.debug:
+        msg: >-
+          Product demos repository cloned successfully to
+          {{ apd_repo_dest }}
+      when: git_clone is succeeded
+
+    # STOPGAP FIX: Ansible version compatibility workaround
+    # Issue: AAP controller includes Ansible 2.14.18, but infra.aap_configuration 4.1.0 requires Ansible >= 2.15.0
+    # Root cause: Collection uses argument specs that aren't compatible with Ansible 2.14.x
+    # Fix: Install ansible-navigator when running on AAP nodes to use execution environment with Ansible 2.15+
+    # TODO: Remove this once AAP controller includes Ansible >= 2.15.0
+    - name: Check if ansible-navigator is installed
+      ansible.builtin.command: which ansible-navigator
+      register: navigator_check
+      failed_when: false
+      changed_when: false
+      when: apd_target_host | default('localhost') != 'localhost'
+
+    - name: Install ansible-navigator on AAP nodes
+      ansible.builtin.pip:
+        name: ansible-navigator
+        state: present
+        executable: pip3
+      when:
+        - apd_target_host | default('localhost') != 'localhost'
+        - navigator_check.rc != 0
+
+    - name: Log in to Red Hat registry for execution environment image pull
+      ansible.builtin.command: >
+        podman login registry.redhat.io
+        --username {{ registry_username }}
+        --password {{ registry_password }}
+      register: podman_login
+      changed_when: "'Login Succeeded' in podman_login.stdout"
+      no_log: true
+      when: apd_target_host | default('localhost') != 'localhost'
+
+    - name: Add collections to requirements file for installation
+      ansible.builtin.copy:
+        content: |
+          ---
+          collections:
+            - infra.aap_configuration
+            - ansible.controller
+        dest: "{{ apd_repo_dest }}/collections/requirements.yml"
+        mode: '0644'
+
+    - name: Install collections inside execution environment before running playbook
+      ansible.builtin.shell: |
+        set -o pipefail
+        ansible-navigator exec \
+          --mode stdout \
+          --pull-policy missing \
+          --execution-environment-image registry.redhat.io/ansible-automation-platform-26/ee-supported-rhel9:latest \
+          -- ansible-galaxy collection install -r collections/requirements.yml -p ./collections
+      args:
+        chdir: "{{ apd_repo_dest }}"
+        executable: /bin/bash
+      register: collection_install_result
+      changed_when: collection_install_result.rc == 0
+
+    - name: Run product-demos installation playbook using ansible-navigator
+      ansible.builtin.shell: |
+        set -o pipefail
+        export ANSIBLE_ALLOW_BROKEN_CONDITIONALS=True
+        export AAP_VALIDATE_CERTS=false
+        ansible-navigator run install-apd.yml \
+          --mode stdout \
+          --pull-policy missing \
+          --execution-environment-image registry.redhat.io/ansible-automation-platform-26/ee-supported-rhel9:latest \
+          --container-options="--network=host" \
+          --pass-environment-variable AAP_HOSTNAME \
+          --pass-environment-variable AAP_USERNAME \
+          --pass-environment-variable AAP_PASSWORD \
+          --pass-environment-variable AAP_VALIDATE_CERTS \
+          --pass-environment-variable ANSIBLE_HOST_KEY_CHECKING 2>&1 | \
+          tee /tmp/apd-install.log
+      args:
+        chdir: "{{ apd_repo_dest }}"
+        executable: /bin/bash
+      environment:
+        AAP_HOSTNAME: "{{ apd_aap_hostname }}"
+        AAP_USERNAME: "{{ apd_aap_username }}"
+        AAP_PASSWORD: "{{ apd_aap_password }}"
+        AAP_VALIDATE_CERTS: "false"
+        ANSIBLE_HOST_KEY_CHECKING: "False"
+      register: apd_install_result
+      changed_when: apd_install_result.rc == 0
+      failed_when: apd_install_result.rc != 0
+      async: 1800  # 30 minutes max
+      poll: 15     # Check every 15 seconds
+
+    - name: Display installation output
+      ansible.builtin.debug:
+        var: apd_install_result.stdout_lines
+      when: apd_install_result.stdout_lines is defined
+
+    - name: Save installation log
+      ansible.builtin.copy:
+        content: "{{ apd_install_result.stdout }}"
+        dest: "/tmp/apd-install-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.log"
+        mode: '0644'
+      when: apd_install_result.stdout is defined
+
+    - name: Clean up repository
+      ansible.builtin.file:
+        path: "{{ apd_repo_dest }}"
+        state: absent
+      when: apd_cleanup | bool
+
+    - name: Launch APD Multi-demo setup job template
+      ansible.controller.job_launch:
+        job_template: "APD | Multi-demo setup"
+        wait: true
+        timeout: 1800
+        controller_host: "{{ apd_aap_hostname }}"
+        controller_username: "{{ apd_aap_username }}"
+        controller_password: "{{ apd_aap_password }}"
+        validate_certs: false
+        extra_vars:
+          demos: |
+            cloud
+            linux
+            network
+            openshift
+            windows
+      register: apd_multi_demo_job
+      when: apd_install_result is succeeded
+      ignore_errors: true
+
+    - name: Display multi-demo setup result
+      ansible.builtin.debug:
+        msg:
+          - "Multi-demo setup job launched successfully"
+          - "Job ID: {{ apd_multi_demo_job.id | default('N/A') }}"
+          - "Status: {{ apd_multi_demo_job.status | default('N/A') }}"
+      when:
+        - apd_install_result is succeeded
+        - apd_multi_demo_job is defined
+        - apd_multi_demo_job is succeeded
+
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg:
+          - "========================================================"
+          - "ANSIBLE PRODUCT DEMOS INSTALLATION COMPLETE!"
+          - "========================================================"
+          - ""
+          - "Access Your AAP Instance:"
+          - "   Web Interface: {{ apd_aap_hostname }}"
+          - "   Username: {{ apd_aap_username }}"
+          - ""
+          - "Demo Content Installed:"
+          - "   - Projects"
+          - "   - Job Templates"
+          - "   - Workflow Templates"
+          - "   - Credentials"
+          - "   - Inventories"
+          - ""
+          - "Multi-Demo Setup:"
+          - "   {% if apd_multi_demo_job is defined and apd_multi_demo_job is succeeded %}✓ All demo categories configured successfully{% elif apd_multi_demo_job is defined %}⚠ Multi-demo setup encountered issues (check job logs){% else %}⚠ Multi-demo setup was not run{% endif %}"
+          - ""
+          - "Next Steps:"
+          - "   1. Log in to AAP web interface"
+          - "   2. Navigate to Templates to see available demos"
+          - "   3. Review Projects for demo playbooks"
+          - "   4. Launch demo job templates to test"
+          - "========================================================"
+      when: apd_install_result is succeeded
+
+    - name: Display failure message
+      ansible.builtin.debug:
+        msg:
+          - "========================================================"
+          - "ANSIBLE PRODUCT DEMOS INSTALLATION FAILED!"
+          - "========================================================"
+          - ""
+          - "Troubleshooting:"
+          - "   1. Check installation log: /tmp/apd-install.log"
+          - "   2. Verify AAP is accessible: {{ apd_aap_hostname }}"
+          - "   3. Check credentials are correct"
+          - "   4. Review error messages above"
+          - "   5. Ensure AAP has internet connectivity"
+          - "========================================================"
+      when: apd_install_result is failed
