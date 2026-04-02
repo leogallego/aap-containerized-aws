@@ -162,7 +162,7 @@
         ansible_host: "{{ public_ip }}"
         ansible_user: ec2-user
         ansible_ssh_private_key_file: "{{ key_path }}"
-        ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o IdentitiesOnly=yes'
 
     - name: Save instance information
       ansible.builtin.copy:
@@ -194,7 +194,7 @@
                     ansible_host: {{ public_ip }}
                     ansible_user: ec2-user
                     ansible_ssh_private_key_file: {{ key_path }}
-                    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+                    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o IdentitiesOnly=yes'
         dest: "{{ inventory_path }}"
         mode: '0644'
 
