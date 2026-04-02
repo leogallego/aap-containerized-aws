@@ -7,7 +7,8 @@ Automated deployment of Ansible Automation Platform (AAP) on AWS infrastructure 
 ```bash
 # 1. Configure credentials
 cp env-vars.sample env-vars.sh
-vim env-vars.sh                    # Update Red Hat registry credentials
+vim env-vars.sh                    # Update Red Hat registry credentials and AWS profile
+aws login                          # Authenticate with AWS (opens browser)
 source env-vars.sh
 
 # 2. Install dependencies
@@ -28,9 +29,8 @@ ansible-playbook playbooks/deploy-aap-with-content.yml
 ## Prerequisites
 
 - Python 3.8+ with Ansible Core 2.14+
-- AWS CLI configured with credentials
-- AWS Access Key ID and Secret Access Key (with EC2, VPC, and IAM permissions)
-- AWS Session Token (if using temporary credentials)
+- AWS CLI v2 configured with credentials
+- AWS permissions for EC2, VPC, and IAM
 - Red Hat subscription with registry access
 - AAP containerized setup bundle
 
@@ -76,6 +76,39 @@ ansible-playbook playbooks/aap/install-content.yml
 ```
 
 ## Configuration
+
+### AWS Credentials Setup
+
+This project uses an AWS CLI profile with `credential_process` to automatically refresh temporary credentials. This prevents token expiration during long-running playbooks (the AAP installer can take 30-40 minutes).
+
+**One-time setup:**
+
+1. Add a profile to `~/.aws/config`:
+
+   ```ini
+   [profile aap-deploy]
+   credential_process = aws configure export-credentials --profile default --format process
+   region = us-east-1
+   ```
+
+2. Log in and verify:
+
+   ```bash
+   aws login
+   aws sts get-caller-identity --profile aap-deploy
+   ```
+
+**Daily workflow:**
+
+```bash
+aws login              # authenticate once per session (opens browser)
+source env-vars.sh     # sets AWS_PROFILE=aap-deploy
+ansible-playbook playbooks/deploy-aap.yml
+```
+
+> **Note:** If you have `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, or `AWS_SESSION_TOKEN` set in your environment, they will override the profile. The `env-vars.sh` script automatically unsets these variables to prevent conflicts.
+
+### Application Settings
 
 Edit `env-vars.sh` for basic settings:
 
