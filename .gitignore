@@ -24,6 +24,8 @@ files/instance-*.txt
 .env
 .env.*
 env-vars.sh
+*-env-vars.sh
+*env-vars*.sh
 set_env.sh
 *.env
 **/secrets.*
