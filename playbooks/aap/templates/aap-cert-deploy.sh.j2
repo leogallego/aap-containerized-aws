@@ -1,0 +1,55 @@
+#!/bin/bash
+# {{ ansible_managed | comment }}
+#
+# Certbot deploy hook for AAP certificate renewal
+# Runs automatically after certbot successfully renews the certificate
+# Location: /etc/letsencrypt/renewal-hooks/deploy/aap-cert-deploy.sh
+
+set -euo pipefail
+
+AAP_USER="ec2-user"
+DOMAIN="${RENEWED_LINEAGE##*/}"
+AAP_HOME="/home/${AAP_USER}/aap"
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [aap-cert-deploy] $*"
+}
+
+log "Starting AAP certificate deployment for domain: ${DOMAIN}"
+
+# Copy renewed certs to AAP gateway location
+if [ -d "${AAP_HOME}/gateway/etc" ]; then
+    cp "${RENEWED_LINEAGE}/fullchain.pem" "${AAP_HOME}/gateway/etc/gateway.cert"
+    cp "${RENEWED_LINEAGE}/privkey.pem" "${AAP_HOME}/gateway/etc/gateway.key"
+    chown "${AAP_USER}:${AAP_USER}" \
+        "${AAP_HOME}/gateway/etc/gateway.cert" \
+        "${AAP_HOME}/gateway/etc/gateway.key"
+    chmod 0600 "${AAP_HOME}/gateway/etc/gateway.key"
+    log "Gateway certificates updated"
+
+    # Restart gateway proxy to pick up new certs
+    runuser -l "${AAP_USER}" -c "systemctl --user restart automation-gateway-proxy"
+    log "Gateway proxy restarted"
+else
+    log "WARNING: Gateway directory not found at ${AAP_HOME}/gateway/etc"
+fi
+
+{% if aap_include_mcp_server | default(false) | bool %}
+# Update MCP server certs
+if [ -d "${AAP_HOME}/mcp/etc" ]; then
+    cp "${RENEWED_LINEAGE}/fullchain.pem" "${AAP_HOME}/mcp/etc/mcp.cert"
+    cp "${RENEWED_LINEAGE}/privkey.pem" "${AAP_HOME}/mcp/etc/mcp.key"
+    chown "${AAP_USER}:${AAP_USER}" \
+        "${AAP_HOME}/mcp/etc/mcp.cert" \
+        "${AAP_HOME}/mcp/etc/mcp.key"
+    chmod 0600 "${AAP_HOME}/mcp/etc/mcp.key"
+    log "MCP server certificates updated"
+
+    runuser -l "${AAP_USER}" -c "systemctl --user restart mcp"
+    log "MCP server restarted"
+else
+    log "WARNING: MCP directory not found at ${AAP_HOME}/mcp/etc — skipping"
+fi
+{% endif %}
+
+log "AAP certificate deployment completed successfully"
