@@ -108,6 +108,32 @@
       loop: "{{ vpcs.vpcs }}"
       when: vpcs.vpcs | length > 0
 
+    - name: Delete Route53 DNS A record
+      amazon.aws.route53:
+        state: absent
+        zone: "{{ route53_hosted_zone_id }}"
+        record: "{{ installer_fqdn_hostname }}"
+        type: A
+      when: route53_hosted_zone_id | default('') | length > 0
+      failed_when: false
+
+    - name: Delete IAM policy from certbot role
+      amazon.aws.iam_policy:
+        iam_type: role
+        iam_name: "{{ instance_name }}-certbot-route53"
+        policy_name: "{{ instance_name }}-certbot-route53-policy"
+        state: absent
+      when: route53_hosted_zone_id | default('') | length > 0
+      failed_when: false
+
+    - name: Delete IAM role and instance profile for certbot
+      amazon.aws.iam_role:
+        name: "{{ instance_name }}-certbot-route53"
+        delete_instance_profile: true
+        state: absent
+      when: route53_hosted_zone_id | default('') | length > 0
+      failed_when: false
+
     - name: Clean up local files
       ansible.builtin.file:
         path: "{{ item }}"
@@ -127,4 +153,8 @@
           - EC2 instance: {{ instance_name }}
           - VPC and associated networking components
           - Security groups and key pairs
-          - Local key files and inventory 
+          {% if route53_hosted_zone_id | default('') | length > 0 %}
+          - Route53 A record: {{ installer_fqdn_hostname }}
+          - IAM role: {{ instance_name }}-certbot-route53
+          {% endif %}
+          - Local key files and inventory
