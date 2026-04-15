@@ -103,6 +103,9 @@ Thumbs.db
 # AWS credential scripts
 aws.sh
 
+# Git Worktrees
+.worktrees/
+
 # Custom ignore patterns
 # Add your specific files here
 # Example:
