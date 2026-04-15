@@ -4,3 +4,6 @@
 collections:
   # AWS Collection - for EC2, VPC, security groups, etc.
   - name: amazon.aws
+
+  # AAP Utilities - for containerized service management, cert handling
+  - name: infra.aap_utilities
