@@ -100,8 +100,11 @@ Thumbs.db
 # Allow .gitkeep files to track empty directories
 !.gitkeep
 
+# AWS credential scripts
+aws.sh
+
 # Custom ignore patterns
 # Add your specific files here
 # Example:
 # my-custom-secrets.yml
-# local-override.yml 
+# local-override.yml
