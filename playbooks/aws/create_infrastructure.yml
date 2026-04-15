@@ -11,6 +11,12 @@
     inventory_path: "{{ project_root | default(playbook_dir + '/../..') }}/inventory/hosts.yml"
 
   tasks:
+    - name: Set Route53 integration flag
+      ansible.builtin.set_fact:
+        __use_route53: >-
+          {{ route53_hosted_zone_id | default('') | length > 0
+             and enable_letsencrypt | default(false) | bool }}
+
     - name: Create VPC
       amazon.aws.ec2_vpc_net:
         name: "{{ instance_name }}-vpc"
@@ -96,6 +102,48 @@
       register: key_pair
       notify: Save private key
 
+    - name: Create IAM role for certbot Route53 access
+      amazon.aws.iam_role:
+        name: "{{ instance_name }}-certbot-route53"
+        assume_role_policy_document:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: ec2.amazonaws.com
+              Action: sts:AssumeRole
+        create_instance_profile: true
+        tags: "{{ common_tags | combine({'Name': instance_name + '-certbot-route53'}) }}"
+        state: present
+      register: certbot_iam_role
+      when: __use_route53 | bool
+
+    - name: Attach Route53 policy to certbot role
+      amazon.aws.iam_policy:
+        iam_type: role
+        iam_name: "{{ instance_name }}-certbot-route53"
+        policy_name: "{{ instance_name }}-certbot-route53-policy"
+        policy_json:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - route53:ListHostedZones
+                - route53:GetChange
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - route53:ChangeResourceRecordSets
+              Resource: >-
+                arn:aws:route53:::hostedzone/{{ route53_hosted_zone_id }}
+        state: present
+      when: __use_route53 | bool
+
+    - name: Wait for IAM instance profile propagation
+      ansible.builtin.pause:
+        seconds: 15
+      when: __use_route53 | bool and certbot_iam_role is changed
+
     - name: Launch EC2 instance
       amazon.aws.ec2_instance:
         name: "{{ instance_name }}"
@@ -115,6 +163,7 @@
             ebs:
               volume_size: "{{ volume_size }}"
               delete_on_termination: true
+        instance_role: "{{ (instance_name + '-certbot-route53') if (__use_route53 | bool) else omit }}"
         wait: true
         wait_timeout: 600
       register: ec2
@@ -147,6 +196,26 @@
         public_ip: "{{ instance_info.instances[0].network_interfaces[0].association.public_ip }}"
         public_dns: "{{ instance_info.instances[0].network_interfaces[0].association.public_dns_name | default('') }}"
       when: public_ip == '' and instance_info is defined
+
+    - name: Create Route53 DNS A record for AAP instance
+      amazon.aws.route53:
+        state: present
+        zone: "{{ route53_hosted_zone_id }}"
+        record: "{{ installer_fqdn_hostname }}"
+        type: A
+        ttl: 300
+        value:
+          - "{{ public_ip }}"
+        overwrite: true
+      when: __use_route53 | bool
+
+    - name: Display Route53 DNS record info
+      ansible.builtin.debug:
+        msg: >-
+          Route53 A record created: {{ installer_fqdn_hostname }} -> {{ public_ip }}.
+          DNS propagation may take up to 60 seconds.
+        verbosity: 0
+      when: __use_route53 | bool
 
     - name: Wait for SSH to become available
       ansible.builtin.wait_for:
