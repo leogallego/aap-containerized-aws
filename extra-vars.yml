@@ -67,6 +67,14 @@ aap_include_mcp_server: >-
   {{ lookup('env', 'AAP_INCLUDE_MCP_SERVER') |
      default('false', true) | bool }}
 
+### SSL/TLS Configuration (Let's Encrypt)
+enable_letsencrypt: >-
+  {{ lookup('env', 'ENABLE_LETSENCRYPT') | default('false', true) | bool }}
+letsencrypt_email: >-
+  {{ lookup('env', 'LETSENCRYPT_EMAIL') | default('', true) }}
+route53_hosted_zone_id: >-
+  {{ lookup('env', 'ROUTE53_HOSTED_ZONE_ID') | default('', true) }}
+
 # MCP Server Configuration
 mcp_allow_write_operations: >-
   {{ lookup('env', 'MCP_ALLOW_WRITE_OPERATIONS') |

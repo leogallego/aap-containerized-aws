@@ -92,6 +92,25 @@ export LIGHTSPEED_CHATBOT_MODEL_ID=""         # Your model ID
 export MCP_ALLOW_WRITE_OPERATIONS="false"
 
 #=============================================================================
+# SSL/TLS CONFIGURATION (Let's Encrypt)
+#=============================================================================
+
+# Enable Let's Encrypt SSL certificates (default: false)
+# When enabled, provisions trusted TLS certificates before AAP installation
+# Requires: INSTALLER_FQDN_HOSTNAME set to a real domain with DNS A record
+# pointing to the EC2 instance public IP
+export ENABLE_LETSENCRYPT="false"
+
+# Email for Let's Encrypt certificate notifications (required if ENABLE_LETSENCRYPT=true)
+export LETSENCRYPT_EMAIL="your-email@example.com"
+
+# AWS Route53 Hosted Zone ID (optional)
+# If set: automates DNS A record creation and uses DNS-01 challenge (recommended)
+# If empty: user must create DNS A record manually, uses HTTP-01 challenge
+# Find your zone ID: aws route53 list-hosted-zones --query 'HostedZones[].{Id:Id,Name:Name}'
+# export ROUTE53_HOSTED_ZONE_ID="Z0123456789ABCDEFGHIJ"
+
+#=============================================================================
 # SETUP BUNDLE CONFIGURATION
 #=============================================================================
 
@@ -149,6 +168,7 @@ echo "- Hub: ${AAP_INCLUDE_AUTOMATION_HUB}"
 echo "- Lightspeed: ${AAP_INCLUDE_LIGHTSPEED}"
 echo "- MCP Server: ${AAP_INCLUDE_MCP_SERVER}"
 echo "- Install Product Demos: ${INSTALL_PRODUCT_DEMOS}"
+echo "- Let's Encrypt: ${ENABLE_LETSENCRYPT:-false}"
 echo ""
 echo "Red Hat Registry configured: $([ -n "${REDHAT_REGISTRY_USERNAME}" ] && echo "✓" || echo "✗")"
 echo "Admin password set: $([ -n "${INSTALLER_ADMIN_PASSWORD}" ] && echo "✓" || echo "✗")"
