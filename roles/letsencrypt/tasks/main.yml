@@ -1,0 +1,40 @@
+---
+- name: Validate Let's Encrypt configuration
+  ansible.builtin.assert:
+    that:
+      - letsencrypt_email | default('') | length > 0
+      - letsencrypt_domain | length > 0
+      - letsencrypt_domain != 'aap.example.org'
+    fail_msg: >-
+      letsencrypt_email and letsencrypt_domain must be set.
+      letsencrypt_domain cannot be the default 'aap.example.org'.
+      Set LETSENCRYPT_EMAIL and INSTALLER_FQDN_HOSTNAME in env-vars.sh.
+
+- name: Validate provider selection
+  ansible.builtin.assert:
+    that:
+      - letsencrypt_provider in ['acme', 'certbot']
+    fail_msg: >-
+      letsencrypt_provider must be 'acme' or 'certbot',
+      got '{{ letsencrypt_provider }}'.
+
+- name: Determine challenge method
+  ansible.builtin.set_fact:
+    __letsencrypt_method: >-
+      {{ 'dns' if (letsencrypt_route53_zone_id | length > 0)
+         else 'http' }}
+
+- name: Display certificate provisioning plan
+  ansible.builtin.debug:
+    msg: >-
+      Provisioning Let's Encrypt certificate for {{ letsencrypt_domain }}
+      using {{ letsencrypt_provider }} provider
+      with {{ __letsencrypt_method | upper }}-01 challenge.
+    verbosity: 1
+
+- name: Provision certificate using {{ letsencrypt_provider }} provider
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/provider_{{ letsencrypt_provider }}.yml"
+
+- name: Deploy certificates to AAP services
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/deploy_certs.yml"
+  when: letsencrypt_deploy_to_aap | bool
