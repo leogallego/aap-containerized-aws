@@ -152,7 +152,9 @@
 
       always:
         - name: Stop temporary HTTP server
-          ansible.builtin.shell: pkill -f 'python3 -m http.server 80' || true
+          ansible.builtin.shell: >-
+            set -o pipefail;
+            pgrep -f 'python3.*http\.server.*80' | xargs -r kill || true
           changed_when: false
 
         - name: Remove challenge directory

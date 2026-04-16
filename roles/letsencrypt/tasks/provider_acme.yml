@@ -214,7 +214,9 @@
 
   always:
     - name: acme | Stop temporary HTTP server
-      ansible.builtin.shell: pkill -f 'python3 -m http.server 80' || true
+      ansible.builtin.shell: >-
+        set -o pipefail;
+        pgrep -f 'python3.*http\.server.*80' | xargs -r kill || true
       become: true
       changed_when: false
 
@@ -249,16 +251,42 @@
 
 # --- Renewal setup ---
 
-- name: acme | Install community.crypto collection on host for renewal
-  ansible.builtin.command: ansible-galaxy collection install community.crypto
-  changed_when: false
+- name: acme | Install Python 3.12 for renewal virtualenv
+  ansible.builtin.dnf:
+    name:
+      - python3.12
+      - python3.12-pip
+    state: present
   become: true
 
-- name: acme | Install amazon.aws collection on host for DNS-01 renewal
-  ansible.builtin.command: ansible-galaxy collection install amazon.aws
+- name: acme | Create renewal virtualenv with Python 3.12
+  ansible.builtin.command:
+    cmd: python3.12 -m venv /opt/aap-certs/venv
+    creates: /opt/aap-certs/venv/bin/python3
+  become: true
+
+- name: acme | Upgrade pip in renewal virtualenv
+  ansible.builtin.pip:
+    name: pip
+    state: latest
+    virtualenv: /opt/aap-certs/venv
+  become: true
+
+- name: acme | Install ansible-core in renewal virtualenv
+  ansible.builtin.pip:
+    name:
+      - ansible-core>=2.16
+    virtualenv: /opt/aap-certs/venv
+  become: true
+
+- name: acme | Install collections into renewal virtualenv
+  ansible.builtin.command: >-
+    /opt/aap-certs/venv/bin/ansible-galaxy collection install {{ item }}
+  loop:
+    - community.crypto
+    - amazon.aws
   changed_when: false
   become: true
-  when: __letsencrypt_method == 'dns'
 
 - name: acme | Create renewal directory
   ansible.builtin.file:
@@ -288,10 +316,37 @@
     minute: "30"
     hour: "2"
     job: >-
-      ansible-playbook /opt/aap-certs/renew.yml
+      /opt/aap-certs/venv/bin/ansible-playbook /opt/aap-certs/renew.yml
       >> /var/log/aap-cert-renewal.log 2>&1
     user: root
   become: true
+
+# --- Renewal verification ---
+
+- name: acme | Verify cron job is registered
+  ansible.builtin.command: crontab -l -u root
+  become: true
+  register: __letsencrypt_cron_check
+  changed_when: false
+
+- name: acme | Fail if renewal cron job is missing
+  ansible.builtin.fail:
+    msg: >-
+      Renewal cron job 'letsencrypt-acme-renew' was not found in root's crontab.
+      Auto-renewal will not work.
+  when: "'letsencrypt-acme-renew' not in __letsencrypt_cron_check.stdout"
+
+- name: acme | Dry-run renewal playbook to verify setup
+  ansible.builtin.command: >-
+    /opt/aap-certs/venv/bin/ansible-playbook /opt/aap-certs/renew.yml --check
+  become: true
+  register: __letsencrypt_renewal_dryrun
+  changed_when: false
+
+- name: acme | Display renewal dry-run result
+  ansible.builtin.debug:
+    msg: "Renewal dry-run completed successfully — cron setup is verified."
+    verbosity: 1
 
 - name: acme | Display provisioning result
   ansible.builtin.debug:

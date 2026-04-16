@@ -4,6 +4,29 @@
 # Usage: source env-vars.sh
 
 #=============================================================================
+# CLEAN SLATE — unset all project variables to prevent stale values
+# leaking across instances when switching env-vars files
+#=============================================================================
+unset AWS_REGION AWS_PROFILE \
+  AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_CREDENTIAL_EXPIRATION \
+  INSTANCE_NAME INSTANCE_TYPE OWNER \
+  REDHAT_REGISTRY_USERNAME REDHAT_REGISTRY_PASSWORD \
+  INSTALLER_ADMIN_PASSWORD INSTALLER_FQDN_HOSTNAME INSTALLER_DIRECTORY \
+  AAP_INCLUDE_CONTROLLER AAP_INCLUDE_EDA_CONTROLLER AAP_INCLUDE_AUTOMATION_HUB \
+  AAP_INCLUDE_LIGHTSPEED AAP_INCLUDE_MCP_SERVER \
+  AAP_DATABASE_HOST AAP_DATABASE_NAME AAP_DATABASE_USERNAME AAP_DATABASE_PASSWORD \
+  AAP_CACHE_HOST AAP_CACHE_PASSWORD \
+  ENABLE_LETSENCRYPT LETSENCRYPT_EMAIL LETSENCRYPT_PROVIDER ROUTE53_HOSTED_ZONE_ID \
+  LIGHTSPEED_ADMIN_USER LIGHTSPEED_ADMIN_EMAIL \
+  LIGHTSPEED_CHATBOT_MODEL_URL LIGHTSPEED_CHATBOT_MODEL_API_KEY LIGHTSPEED_CHATBOT_MODEL_ID \
+  LIGHTSPEED_MCP_CONTROLLER_ENABLED LIGHTSPEED_MCP_LIGHTSPEED_ENABLED \
+  MCP_ALLOW_WRITE_OPERATIONS \
+  SKIP_SYSTEM_UPDATE BUNDLE_INSTALL \
+  INSTALL_PRODUCT_DEMOS PRODUCT_DEMOS_REPO_URL PRODUCT_DEMOS_REPO_VERSION \
+  VPC_CIDR SUBNET_CIDR SSH_KEY_NAME \
+  2>/dev/null
+
+#=============================================================================
 # AWS CONFIGURATION
 #=============================================================================
 
@@ -24,8 +47,6 @@ export AWS_REGION="us-east-1"
 #
 export AWS_PROFILE="aap-deploy"
 
-# IMPORTANT: Unset any static credentials that would override the profile
-unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_CREDENTIAL_EXPIRATION 2>/dev/null
 
 # Legacy: Static credentials (NOT recommended - tokens expire after ~20 min)
 # export AWS_ACCESS_KEY_ID="your-access-key-here"
