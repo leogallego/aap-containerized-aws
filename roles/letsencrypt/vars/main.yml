@@ -1,0 +1,4 @@
+---
+# Internal constants — not user-facing
+__letsencrypt_renewal_dir: /opt/aap-certs
+__letsencrypt_renewal_venv: /opt/aap-certs/venv

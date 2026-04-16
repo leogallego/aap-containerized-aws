@@ -169,6 +169,7 @@
       become: true
       when: "'LISTEN' in __letsencrypt_acme_port80.stdout"
       register: __letsencrypt_acme_gateway_stopped
+      changed_when: true
 
     - name: acme | Create challenge response directory
       ansible.builtin.file:
@@ -192,6 +193,7 @@
       async: 120
       poll: 0
       register: __letsencrypt_acme_http_server
+      changed_when: true
 
     - name: acme | Wait for HTTP server to start
       ansible.builtin.wait_for:
@@ -284,40 +286,40 @@
 
 - name: acme | Check for stale renewal virtualenv
   ansible.builtin.stat:
-    path: /opt/aap-certs/venv/bin/python3.12
+    path: "{{ __letsencrypt_renewal_venv }}/bin/python3.12"
   become: true
   register: __letsencrypt_venv_python312
 
 - name: acme | Remove stale renewal virtualenv
   ansible.builtin.file:
-    path: /opt/aap-certs/venv
+    path: "{{ __letsencrypt_renewal_venv }}"
     state: absent
   become: true
   when: not __letsencrypt_venv_python312.stat.exists | default(false)
 
 - name: acme | Create renewal virtualenv with Python 3.12
   ansible.builtin.command:
-    cmd: python3.12 -m venv /opt/aap-certs/venv
-    creates: /opt/aap-certs/venv/bin/python3.12
+    cmd: "python3.12 -m venv {{ __letsencrypt_renewal_venv }}"
+    creates: "{{ __letsencrypt_renewal_venv }}/bin/python3.12"
   become: true
 
 - name: acme | Upgrade pip in renewal virtualenv
   ansible.builtin.pip:
     name: pip
     state: latest
-    virtualenv: /opt/aap-certs/venv
+    virtualenv: "{{ __letsencrypt_renewal_venv }}"
   become: true
 
 - name: acme | Install ansible-core in renewal virtualenv
   ansible.builtin.pip:
     name:
       - ansible-core>=2.16
-    virtualenv: /opt/aap-certs/venv
+    virtualenv: "{{ __letsencrypt_renewal_venv }}"
   become: true
 
 - name: acme | Install collections into renewal virtualenv
   ansible.builtin.command: >-
-    /opt/aap-certs/venv/bin/ansible-galaxy collection install {{ item }}
+    {{ __letsencrypt_renewal_venv }}/bin/ansible-galaxy collection install {{ item }}
   loop:
     - community.crypto
     - amazon.aws
@@ -326,7 +328,7 @@
 
 - name: acme | Create renewal directory
   ansible.builtin.file:
-    path: /opt/aap-certs
+    path: "{{ __letsencrypt_renewal_dir }}"
     state: directory
     mode: '0755'
   become: true
@@ -334,14 +336,14 @@
 - name: acme | Deploy renewal playbook
   ansible.builtin.copy:
     src: "{{ role_path }}/files/acme-renewal.yml"
-    dest: /opt/aap-certs/renew.yml
+    dest: "{{ __letsencrypt_renewal_dir }}/renew.yml"
     mode: '0644'
   become: true
 
 - name: acme | Deploy renewal variables
   ansible.builtin.template:
     src: "{{ role_path }}/templates/acme-renewal-vars.yml.j2"
-    dest: /opt/aap-certs/vars.yml
+    dest: "{{ __letsencrypt_renewal_dir }}/vars.yml"
     mode: '0600'
     backup: true
   become: true
@@ -352,7 +354,7 @@
     minute: "30"
     hour: "2"
     job: >-
-      /opt/aap-certs/venv/bin/ansible-playbook /opt/aap-certs/renew.yml
+      {{ __letsencrypt_renewal_venv }}/bin/ansible-playbook {{ __letsencrypt_renewal_dir }}/renew.yml
       >> /var/log/aap-cert-renewal.log 2>&1
     user: root
   become: true
@@ -374,7 +376,7 @@
 
 - name: acme | Dry-run renewal playbook to verify setup
   ansible.builtin.command: >-
-    /opt/aap-certs/venv/bin/ansible-playbook /opt/aap-certs/renew.yml --check
+    {{ __letsencrypt_renewal_venv }}/bin/ansible-playbook {{ __letsencrypt_renewal_dir }}/renew.yml --check
   become: true
   register: __letsencrypt_renewal_dryrun
   changed_when: false

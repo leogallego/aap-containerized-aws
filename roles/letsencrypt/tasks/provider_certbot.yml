@@ -23,7 +23,7 @@
   changed_when: false
   register: __letsencrypt_certbot_bin
   environment:
-    PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+    PATH: "/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
 - name: certbot | Check if certificate already exists
   ansible.builtin.stat:

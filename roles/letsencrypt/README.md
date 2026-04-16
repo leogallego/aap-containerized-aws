@@ -119,6 +119,18 @@ Running the role twice with the same parameters produces no changes the second t
 
 Switching providers (e.g. from certbot to acme) is handled safely — the role detects and cleans up the previous provider's file structure before generating new keys.
 
+## Check Mode
+
+The role supports `--check` mode for validation without making changes. ACME/certbot certificate requests and `command:` tasks are skipped in check mode. Stat-based checks and assertions run normally, allowing you to verify configuration before applying.
+
+## Rollback
+
+The role does not provide automated rollback. To revert to the previous state:
+
+1. **Restore self-signed certificates**: re-run the AAP installer without `ENABLE_LETSENCRYPT` — the installer regenerates its own self-signed certificates.
+2. **Restore previous Let's Encrypt certificate**: template and copy tasks use `backup: true`, so the previous files are preserved on disk with a timestamped suffix. Manually restore and restart the gateway.
+3. **Remove renewal automation**: delete the cron job (`crontab -e -u root`) and the renewal directory (`/opt/aap-certs` for acme, `/etc/letsencrypt` for certbot).
+
 ## Renewal
 
 Both providers set up automatic renewal via cron:

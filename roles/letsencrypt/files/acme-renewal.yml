@@ -129,6 +129,7 @@
           async: 120
           poll: 0
           register: __http_server
+          changed_when: true
 
         - name: Wait for HTTP server to start
           ansible.builtin.wait_for:

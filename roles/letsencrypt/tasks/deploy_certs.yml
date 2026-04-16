@@ -70,15 +70,21 @@
     timeout: 30
   when: __letsencrypt_gateway_dir.stat.exists | default(false)
 
-- name: deploy | Verify gateway is serving the correct certificate
+- name: deploy | Verify gateway certificate - fetch served certificate
   community.crypto.get_certificate:
     host: localhost
     port: 443
     server_name: "{{ letsencrypt_domain }}"
+  register: __letsencrypt_gateway_fetched_cert
+  when: __letsencrypt_gateway_dir.stat.exists | default(false)
+
+- name: deploy | Verify gateway certificate - parse certificate info
+  community.crypto.x509_certificate_info:
+    content: "{{ __letsencrypt_gateway_fetched_cert.cert }}"
   register: __letsencrypt_gateway_cert
   when: __letsencrypt_gateway_dir.stat.exists | default(false)
 
-- name: deploy | Fail if gateway certificate does not match
+- name: deploy | Verify gateway certificate - fail if domain does not match
   ansible.builtin.fail:
     msg: >-
       Gateway is not serving the expected certificate for {{ letsencrypt_domain }}.

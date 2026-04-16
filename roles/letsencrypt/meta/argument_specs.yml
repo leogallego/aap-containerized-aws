@@ -45,6 +45,18 @@ argument_specs:
         default: 30
         description: Renew certificate when fewer than this many days remain.
 
+      letsencrypt_cert_dir:
+        type: str
+        default: /etc/letsencrypt/live
+        description: >-
+          Base directory for certificate storage.
+
+      letsencrypt_acme_key_dir:
+        type: str
+        default: /etc/letsencrypt/acme
+        description: >-
+          Directory for ACME account key and CSR files.
+
       letsencrypt_deploy_to_aap:
         type: bool
         default: false
