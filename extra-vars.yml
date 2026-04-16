@@ -74,6 +74,8 @@ letsencrypt_email: >-
   {{ lookup('env', 'LETSENCRYPT_EMAIL') | default('', true) }}
 route53_hosted_zone_id: >-
   {{ lookup('env', 'ROUTE53_HOSTED_ZONE_ID') | default('', true) }}
+letsencrypt_provider: >-
+  {{ lookup('env', 'LETSENCRYPT_PROVIDER') | default('acme', true) }}
 
 # MCP Server Configuration
 mcp_allow_write_operations: >-

@@ -7,3 +7,6 @@ collections:
 
   # AAP Utilities - for containerized service management, cert handling
   - name: infra.aap_utilities
+
+  # Crypto Collection - for ACME certificate provisioning (acme provider)
+  - name: community.crypto
