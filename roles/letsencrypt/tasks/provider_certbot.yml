@@ -1,0 +1,135 @@
+---
+# Certbot provider for Let's Encrypt certificate provisioning
+# Installs certbot, obtains certificate, sets up auto-renewal via cron
+
+- name: certbot | Install certbot
+  ansible.builtin.pip:
+    name:
+      - certbot
+    state: present
+  become: true
+
+- name: certbot | Install certbot Route53 DNS plugin
+  ansible.builtin.pip:
+    name:
+      - certbot-dns-route53
+    state: present
+  become: true
+  when: __letsencrypt_method == 'dns'
+
+- name: certbot | Locate certbot binary
+  ansible.builtin.command: which certbot
+  become: true
+  changed_when: false
+  register: __letsencrypt_certbot_bin
+  environment:
+    PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+
+- name: certbot | Check if certificate already exists
+  ansible.builtin.stat:
+    path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+  register: __letsencrypt_existing_cert
+  become: true
+
+- name: certbot | Request certificate via DNS challenge (Route53)
+  ansible.builtin.command: >-
+    {{ __letsencrypt_certbot_bin.stdout }} certonly
+    --dns-route53
+    --non-interactive
+    --agree-tos
+    --email {{ letsencrypt_email }}
+    -d {{ letsencrypt_domain }}
+  become: true
+  register: __letsencrypt_dns_result
+  changed_when: >-
+    'Certificate not yet due for renewal' not in __letsencrypt_dns_result.stdout
+  when:
+    - __letsencrypt_method == 'dns'
+    - not __letsencrypt_existing_cert.stat.exists
+
+- name: certbot | Check if port 80 is in use
+  ansible.builtin.command: ss -tlnp sport = :80
+  become: true
+  register: __letsencrypt_port80_check
+  changed_when: false
+  when: __letsencrypt_method == 'http'
+
+- name: certbot | Set pre/post hooks to free port 80
+  ansible.builtin.set_fact:
+    __letsencrypt_certbot_pre_hook: >-
+      --pre-hook "runuser -l {{ letsencrypt_aap_user }}
+      -c 'systemctl --user stop automation-gateway-proxy'"
+    __letsencrypt_certbot_post_hook: >-
+      --post-hook "runuser -l {{ letsencrypt_aap_user }}
+      -c 'systemctl --user start automation-gateway-proxy'"
+  when:
+    - __letsencrypt_method == 'http'
+    - "'LISTEN' in (__letsencrypt_port80_check.stdout | default(''))"
+
+- name: certbot | Request certificate via HTTP challenge (standalone)
+  ansible.builtin.command: >-
+    {{ __letsencrypt_certbot_bin.stdout }} certonly
+    --standalone
+    --non-interactive
+    --agree-tos
+    --email {{ letsencrypt_email }}
+    -d {{ letsencrypt_domain }}
+    {{ __letsencrypt_certbot_pre_hook | default('') }}
+    {{ __letsencrypt_certbot_post_hook | default('') }}
+  become: true
+  register: __letsencrypt_http_result
+  changed_when: >-
+    'Certificate not yet due for renewal' not in __letsencrypt_http_result.stdout
+  when:
+    - __letsencrypt_method == 'http'
+    - not __letsencrypt_existing_cert.stat.exists
+
+- name: certbot | Verify certificate was obtained
+  ansible.builtin.stat:
+    path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+  register: __letsencrypt_cert_check
+  become: true
+
+- name: certbot | Fail if certificate was not obtained
+  ansible.builtin.fail:
+    msg: >-
+      Let's Encrypt certificate was not obtained for {{ letsencrypt_domain }}.
+      Check certbot logs at /var/log/letsencrypt/letsencrypt.log for details.
+  when: not __letsencrypt_cert_check.stat.exists
+
+- name: certbot | Create renewal hooks directory
+  ansible.builtin.file:
+    path: /etc/letsencrypt/renewal-hooks/deploy
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: certbot | Deploy AAP certificate renewal hook
+  ansible.builtin.template:
+    src: "{{ role_path }}/templates/aap-cert-deploy.sh.j2"
+    dest: /etc/letsencrypt/renewal-hooks/deploy/aap-cert-deploy.sh
+    mode: '0755'
+    backup: true
+  become: true
+
+- name: certbot | Set up auto-renewal cron job
+  ansible.builtin.cron:
+    name: "letsencrypt-certbot-renew"
+    minute: "30"
+    hour: "2,14"
+    job: >-
+      {{ __letsencrypt_certbot_bin.stdout }} renew --quiet
+      --deploy-hook /etc/letsencrypt/renewal-hooks/deploy/aap-cert-deploy.sh
+    user: root
+  become: true
+
+- name: certbot | Display provisioning result
+  ansible.builtin.debug:
+    msg:
+      - "Let's Encrypt certificate provisioned (certbot provider)"
+      - "Domain: {{ letsencrypt_domain }}"
+      - "Method: {{ __letsencrypt_method | upper }}-01 challenge"
+      - "Cert: {{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+      - "Key: {{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
+      - "Auto-renewal: certbot renew via cron at 2:30 and 14:30 daily"
+    verbosity: 1
