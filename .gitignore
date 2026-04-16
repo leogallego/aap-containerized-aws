@@ -15,8 +15,8 @@ files/*-key.pem
 files/*.key
 
 # Generated Inventory and Instance Information
-inventory/hosts.yml
-inventory/hosts
+inventory/*
+!inventory/hosts.yml.sample
 files/*-info.txt
 files/instance-*.txt
 
