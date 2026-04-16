@@ -4,7 +4,7 @@
 #
 # Usage:
 #   source env-vars.sh
-#   ansible-playbook -i inventory/hosts.yml playbooks/provision-letsencrypt.yml -e @extra-vars.yml
+#   ansible-playbook -i inventory/<instance-name>-hosts.yml playbooks/provision-letsencrypt.yml -e @extra-vars.yml
 #
 # Required variables:
 #   - installer_fqdn_hostname: domain name for the certificate

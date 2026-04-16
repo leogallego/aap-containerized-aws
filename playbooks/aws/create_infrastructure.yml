@@ -8,7 +8,7 @@
   vars:
     key_path: "{{ project_root | default(playbook_dir + '/../..') }}/files/{{ instance_name }}-key.pem"
     instance_info_path: "{{ project_root | default(playbook_dir + '/../..') }}/files/{{ instance_name }}-info.txt"
-    inventory_path: "{{ project_root | default(playbook_dir + '/../..') }}/inventory/hosts.yml"
+    inventory_path: "{{ project_root | default(playbook_dir + '/../..') }}/inventory/{{ instance_name }}-hosts.yml"
 
   tasks:
     - name: Set Route53 integration flag

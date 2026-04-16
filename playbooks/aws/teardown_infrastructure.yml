@@ -141,7 +141,7 @@
       loop:
         - "{{ playbook_dir }}/../../files/{{ instance_name }}-key.pem"
         - "{{ playbook_dir }}/../../files/{{ instance_name }}-info.txt"
-        - "{{ playbook_dir }}/../../inventory/hosts.yml"
+        - "{{ playbook_dir }}/../../inventory/{{ instance_name }}-hosts.yml"
       ignore_errors: true
 
     - name: Display teardown completion
