@@ -20,9 +20,7 @@
 
 - name: Determine challenge method
   ansible.builtin.set_fact:
-    __letsencrypt_method: >-
-      {{ 'dns' if (letsencrypt_route53_zone_id | length > 0)
-         else 'http' }}
+    __letsencrypt_method: "{{ 'dns' if (letsencrypt_route53_zone_id | length > 0) else 'http' }}"
 
 - name: Display certificate provisioning plan
   ansible.builtin.debug:

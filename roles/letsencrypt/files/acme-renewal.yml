@@ -106,6 +106,7 @@
           ansible.builtin.command: >-
             runuser -l {{ letsencrypt_aap_user }}
             -c 'systemctl --user stop automation-gateway-proxy'
+          changed_when: true
           when: "'LISTEN' in __port80_check.stdout"
           register: __gateway_stopped
 

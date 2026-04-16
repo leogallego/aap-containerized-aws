@@ -102,7 +102,7 @@
       register: key_pair
       notify: Save private key
 
-    - name: Create IAM role for certbot Route53 access
+    - name: Create IAM role for Let's Encrypt Route53 access
       amazon.aws.iam_role:
         name: "{{ instance_name }}-letsencrypt-route53"
         assume_role_policy_document:
@@ -115,10 +115,10 @@
         create_instance_profile: true
         tags: "{{ common_tags | combine({'Name': instance_name + '-letsencrypt-route53'}) }}"
         state: present
-      register: certbot_iam_role
+      register: __letsencrypt_iam_role
       when: __use_route53 | bool
 
-    - name: Attach Route53 policy to certbot role
+    - name: Attach Route53 policy to letsencrypt role
       amazon.aws.iam_policy:
         iam_type: role
         iam_name: "{{ instance_name }}-letsencrypt-route53"
@@ -142,7 +142,7 @@
     - name: Wait for IAM instance profile propagation
       ansible.builtin.pause:
         seconds: 15
-      when: __use_route53 | bool and certbot_iam_role is changed
+      when: __use_route53 | bool and __letsencrypt_iam_role is changed
 
     - name: Launch EC2 instance
       amazon.aws.ec2_instance:
