@@ -63,10 +63,34 @@
         -c 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user restart mcp'
       changed_when: true
 
+- name: deploy | Wait for gateway to start serving HTTPS
+  ansible.builtin.wait_for:
+    port: 443
+    delay: 5
+    timeout: 30
+  when: __letsencrypt_gateway_dir.stat.exists | default(false)
+
+- name: deploy | Verify gateway is serving the correct certificate
+  community.crypto.get_certificate:
+    host: localhost
+    port: 443
+    server_name: "{{ letsencrypt_domain }}"
+  register: __letsencrypt_gateway_cert
+  when: __letsencrypt_gateway_dir.stat.exists | default(false)
+
+- name: deploy | Fail if gateway certificate does not match
+  ansible.builtin.fail:
+    msg: >-
+      Gateway is not serving the expected certificate for {{ letsencrypt_domain }}.
+      Served subject alt names: {{ __letsencrypt_gateway_cert.subject_alt_name }}
+  when:
+    - __letsencrypt_gateway_dir.stat.exists | default(false)
+    - "'DNS:' + letsencrypt_domain not in __letsencrypt_gateway_cert.subject_alt_name"
+
 - name: deploy | Display deployment result
   ansible.builtin.debug:
     msg:
       - "Certificates deployed to AAP services"
-      - "Gateway: {{ 'deployed' if __letsencrypt_gateway_dir.stat.exists | default(false) else 'not found, skipped' }}"
+      - "Gateway: {{ 'deployed and verified' if __letsencrypt_gateway_dir.stat.exists | default(false) else 'not found, skipped' }}"
       - "MCP: {{ 'deployed' if (__letsencrypt_mcp_dir.stat.exists | default(false)) else 'not found or disabled, skipped' }}"
     verbosity: 1

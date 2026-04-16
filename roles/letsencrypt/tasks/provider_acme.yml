@@ -50,6 +50,7 @@
     path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
     size: 2048
     mode: '0600'
+    force: false
   become: true
 
 - name: acme | Generate certificate signing request
@@ -59,6 +60,7 @@
     common_name: "{{ letsencrypt_domain }}"
     subject_alt_name:
       - "DNS:{{ letsencrypt_domain }}"
+    force: false
   become: true
 
 - name: acme | Register ACME account
@@ -248,6 +250,27 @@
       ACME certificate was not obtained for {{ letsencrypt_domain }}.
       Check the Ansible output above for error details.
   when: not __letsencrypt_acme_cert_check.stat.exists
+
+- name: acme | Validate certificate content
+  community.crypto.x509_certificate_info:
+    path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+  become: true
+  register: __letsencrypt_acme_cert_info
+
+- name: acme | Fail if certificate is not for the expected domain
+  ansible.builtin.fail:
+    msg: >-
+      Certificate subject does not match expected domain {{ letsencrypt_domain }}.
+      Subject alt names: {{ __letsencrypt_acme_cert_info.subject_alt_name }}
+  when: >-
+    'DNS:' + letsencrypt_domain not in __letsencrypt_acme_cert_info.subject_alt_name
+
+- name: acme | Fail if certificate is already expired
+  ansible.builtin.fail:
+    msg: >-
+      Certificate for {{ letsencrypt_domain }} is already expired.
+      Not after: {{ __letsencrypt_acme_cert_info.not_after }}
+  when: __letsencrypt_acme_cert_info.expired
 
 # --- Renewal setup ---
 
