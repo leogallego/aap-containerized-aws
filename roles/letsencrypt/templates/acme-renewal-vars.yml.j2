@@ -1,0 +1,14 @@
+# {{ ansible_managed | comment }}
+# Renewal variables for ACME certificate renewal playbook
+# Deployed by the letsencrypt role — do not edit manually
+
+letsencrypt_domain: "{{ letsencrypt_domain }}"
+letsencrypt_email: "{{ letsencrypt_email }}"
+letsencrypt_acme_directory: "{{ letsencrypt_acme_directory }}"
+letsencrypt_remaining_days: {{ letsencrypt_remaining_days }}
+letsencrypt_method: "{{ __letsencrypt_method }}"
+letsencrypt_route53_zone_id: "{{ letsencrypt_route53_zone_id }}"
+letsencrypt_aap_user: "{{ letsencrypt_aap_user }}"
+letsencrypt_include_mcp: {{ letsencrypt_include_mcp | bool }}
+letsencrypt_cert_dir: "{{ letsencrypt_cert_dir }}"
+letsencrypt_acme_key_dir: "{{ letsencrypt_acme_key_dir }}"
