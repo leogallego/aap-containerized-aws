@@ -1,0 +1,63 @@
+---
+argument_specs:
+  main:
+    short_description: >-
+      Provision Let's Encrypt SSL certificates using certbot or community.crypto
+    description:
+      - >-
+        Obtains SSL/TLS certificates from Let's Encrypt using the specified
+        provider. Supports DNS-01 (Route53) and HTTP-01 challenge methods.
+        Optionally deploys certificates to running AAP services.
+    options:
+      letsencrypt_provider:
+        type: str
+        default: acme
+        choices:
+          - acme
+          - certbot
+        description: Certificate provisioning provider.
+
+      letsencrypt_email:
+        type: str
+        required: true
+        description: Email address for Let's Encrypt account notifications.
+
+      letsencrypt_domain:
+        type: str
+        required: true
+        description: Domain name for the certificate.
+
+      letsencrypt_route53_zone_id:
+        type: str
+        default: ""
+        description: >-
+          Route53 hosted zone ID for DNS-01 challenge.
+          If empty, HTTP-01 challenge is used.
+
+      letsencrypt_acme_directory:
+        type: str
+        default: https://acme-v02.api.letsencrypt.org/directory
+        description: >-
+          ACME directory URL. Use staging URL for testing.
+
+      letsencrypt_remaining_days:
+        type: int
+        default: 30
+        description: Renew certificate when fewer than this many days remain.
+
+      letsencrypt_deploy_to_aap:
+        type: bool
+        default: false
+        description: >-
+          Deploy certificates to AAP service directories and restart services.
+          Set to true for standalone use on running AAP instances.
+
+      letsencrypt_aap_user:
+        type: str
+        default: ec2-user
+        description: AAP service user for certificate file ownership and restarts.
+
+      letsencrypt_include_mcp:
+        type: bool
+        default: false
+        description: Whether to deploy certificates to the MCP server.
