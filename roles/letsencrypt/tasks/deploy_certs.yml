@@ -28,7 +28,7 @@
     - name: deploy | Restart AAP gateway proxy
       ansible.builtin.command: >-
         runuser -l {{ letsencrypt_aap_user }}
-        -c 'systemctl --user restart automation-gateway-proxy'
+        -c 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user restart automation-gateway-proxy'
       changed_when: true
 
 - name: deploy | Check if MCP server directory exists
@@ -60,7 +60,7 @@
     - name: deploy | Restart MCP server
       ansible.builtin.command: >-
         runuser -l {{ letsencrypt_aap_user }}
-        -c 'systemctl --user restart mcp'
+        -c 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user restart mcp'
       changed_when: true
 
 - name: deploy | Display deployment result

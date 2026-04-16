@@ -58,10 +58,10 @@
   ansible.builtin.set_fact:
     __letsencrypt_certbot_pre_hook: >-
       --pre-hook "runuser -l {{ letsencrypt_aap_user }}
-      -c 'systemctl --user stop automation-gateway-proxy'"
+      -c 'XDG_RUNTIME_DIR=/run/user/\$(id -u) systemctl --user stop automation-gateway-proxy'"
     __letsencrypt_certbot_post_hook: >-
       --post-hook "runuser -l {{ letsencrypt_aap_user }}
-      -c 'systemctl --user start automation-gateway-proxy'"
+      -c 'XDG_RUNTIME_DIR=/run/user/\$(id -u) systemctl --user start automation-gateway-proxy'"
   when:
     - __letsencrypt_method == 'http'
     - "'LISTEN' in (__letsencrypt_port80_check.stdout | default(''))"

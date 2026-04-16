@@ -26,7 +26,7 @@ if [ -d "${AAP_HOME}/gateway/etc" ]; then
     log "Gateway certificates updated"
 
     # Restart gateway proxy to pick up new certs
-    runuser -l "${AAP_USER}" -c "systemctl --user restart automation-gateway-proxy"
+    runuser -l "${AAP_USER}" -c "XDG_RUNTIME_DIR=/run/user/\$(id -u) systemctl --user restart automation-gateway-proxy"
     log "Gateway proxy restarted"
 else
     log "WARNING: Gateway directory not found at ${AAP_HOME}/gateway/etc"
@@ -41,7 +41,7 @@ if [ -d "${AAP_HOME}/mcp/etc" ]; then
         "${RENEWED_LINEAGE}/privkey.pem" "${AAP_HOME}/mcp/etc/mcp.key"
     log "MCP server certificates updated"
 
-    runuser -l "${AAP_USER}" -c "systemctl --user restart mcp"
+    runuser -l "${AAP_USER}" -c "XDG_RUNTIME_DIR=/run/user/\$(id -u) systemctl --user restart mcp"
     log "MCP server restarted"
 else
     log "WARNING: MCP directory not found at ${AAP_HOME}/mcp/etc — skipping"

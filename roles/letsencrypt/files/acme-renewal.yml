@@ -105,7 +105,7 @@
         - name: Stop gateway proxy to free port 80
           ansible.builtin.command: >-
             runuser -l {{ letsencrypt_aap_user }}
-            -c 'systemctl --user stop automation-gateway-proxy'
+            -c 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user stop automation-gateway-proxy'
           changed_when: true
           when: "'LISTEN' in __port80_check.stdout"
           register: __gateway_stopped
@@ -163,7 +163,7 @@
         - name: Restart gateway proxy
           ansible.builtin.command: >-
             runuser -l {{ letsencrypt_aap_user }}
-            -c 'systemctl --user start automation-gateway-proxy'
+            -c 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user start automation-gateway-proxy'
           changed_when: true
           when: __gateway_stopped is defined and __gateway_stopped is changed
 
@@ -195,7 +195,7 @@
         - name: Restart gateway proxy with renewed certificate
           ansible.builtin.command: >-
             runuser -l {{ letsencrypt_aap_user }}
-            -c 'systemctl --user restart automation-gateway-proxy'
+            -c 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user restart automation-gateway-proxy'
           changed_when: true
           when: __gateway_dir.stat.exists | default(false)
 
@@ -227,6 +227,6 @@
         - name: Restart MCP server with renewed certificate
           ansible.builtin.command: >-
             runuser -l {{ letsencrypt_aap_user }}
-            -c 'systemctl --user restart mcp'
+            -c 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user restart mcp'
           changed_when: true
           when: __mcp_dir.stat.exists | default(false)

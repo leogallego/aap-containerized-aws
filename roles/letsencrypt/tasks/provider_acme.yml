@@ -25,6 +25,26 @@
     mode: '0600'
   become: true
 
+- name: acme | Check for certbot symlinks from previous provider
+  ansible.builtin.stat:
+    path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
+  become: true
+  register: __letsencrypt_privkey_stat
+
+- name: acme | Remove certbot symlinks if switching providers
+  ansible.builtin.file:
+    path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/{{ item }}"
+    state: absent
+  loop:
+    - privkey.pem
+    - fullchain.pem
+    - cert.pem
+    - chain.pem
+  become: true
+  when:
+    - __letsencrypt_privkey_stat.stat.exists | default(false)
+    - __letsencrypt_privkey_stat.stat.islnk | default(false)
+
 - name: acme | Generate certificate private key
   community.crypto.openssl_privatekey:
     path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
@@ -143,7 +163,7 @@
     - name: acme | Stop gateway proxy to free port 80
       ansible.builtin.command: >-
         runuser -l {{ letsencrypt_aap_user }}
-        -c 'systemctl --user stop automation-gateway-proxy'
+        -c 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user stop automation-gateway-proxy'
       become: true
       when: "'LISTEN' in __letsencrypt_acme_port80.stdout"
       register: __letsencrypt_acme_gateway_stopped
@@ -207,7 +227,7 @@
     - name: acme | Restart gateway proxy after HTTP challenge
       ansible.builtin.command: >-
         runuser -l {{ letsencrypt_aap_user }}
-        -c 'systemctl --user start automation-gateway-proxy'
+        -c 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user start automation-gateway-proxy'
       become: true
       changed_when: true
       when: __letsencrypt_acme_gateway_stopped is defined and __letsencrypt_acme_gateway_stopped is changed

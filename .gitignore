@@ -40,6 +40,7 @@ files/generated-*
 *.retry
 .ansible/
 ansible.cfg
+collections/
 
 # Log Files
 *.log
