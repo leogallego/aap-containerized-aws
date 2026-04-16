@@ -34,6 +34,7 @@
       {% else %}
       HTTP standalone mode on port 80 (ensure DNS A record exists).
       {% endif %}
+    verbosity: 1
 
 - name: Install certbot
   ansible.builtin.pip:
@@ -71,6 +72,25 @@
     - __letsencrypt_method == 'dns'
     - not __existing_cert.stat.exists
 
+- name: Check if AAP gateway is running on port 80
+  ansible.builtin.command: ss -tlnp sport = :80
+  become: true
+  register: __port80_check
+  changed_when: false
+  when: __letsencrypt_method == 'http'
+
+- name: Set gateway stop/start hooks for HTTP challenge
+  ansible.builtin.set_fact:
+    __certbot_pre_hook: >-
+      {{ '--pre-hook "runuser -l ' + ansible_user + ' -c \'systemctl --user stop automation-gateway-proxy\'"'
+         if 'LISTEN' in (__port80_check.stdout | default(''))
+         else '' }}
+    __certbot_post_hook: >-
+      {{ '--post-hook "runuser -l ' + ansible_user + ' -c \'systemctl --user start automation-gateway-proxy\'"'
+         if 'LISTEN' in (__port80_check.stdout | default(''))
+         else '' }}
+  when: __letsencrypt_method == 'http'
+
 - name: Request certificate via HTTP challenge (standalone)
   ansible.builtin.command: >-
     certbot certonly
@@ -79,6 +99,8 @@
     --agree-tos
     --email {{ letsencrypt_email }}
     -d {{ installer_fqdn_hostname }}
+    {{ __certbot_pre_hook | default('') }}
+    {{ __certbot_post_hook | default('') }}
   become: true
   register: __certbot_http_result
   changed_when: "'Certificate not yet due for renewal' not in __certbot_http_result.stdout"
@@ -112,6 +134,7 @@
       {{ project_root | default(playbook_dir + '/../..') }}/playbooks/aap/templates/aap-cert-deploy.sh.j2
     dest: /etc/letsencrypt/renewal-hooks/deploy/aap-cert-deploy.sh
     mode: '0755'
+    backup: true
   become: true
 
 - name: Set up certbot auto-renewal cron job
@@ -134,3 +157,4 @@
       - "Cert: /etc/letsencrypt/live/{{ installer_fqdn_hostname }}/fullchain.pem"
       - "Key: /etc/letsencrypt/live/{{ installer_fqdn_hostname }}/privkey.pem"
       - "Auto-renewal: cron at 2:30 and 14:30 daily"
+    verbosity: 1

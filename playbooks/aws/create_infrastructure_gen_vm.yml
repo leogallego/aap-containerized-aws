@@ -66,6 +66,7 @@
         msg: >-
           Instance name: {{ gen_instance_name }}
           (set INSTANCE_NAME or -e gen_instance_name=<name> to reuse an existing VM)
+        verbosity: 1
 
     - name: Create VPC
       amazon.aws.ec2_vpc_net:
@@ -262,6 +263,7 @@
           - SSH Command: ssh -i {{ key_path }} ec2-user@{{ public_ip }}
 
           Inventory written to: {{ inventory_path }}
+        verbosity: 1
 
   handlers:
     - name: Save private key
