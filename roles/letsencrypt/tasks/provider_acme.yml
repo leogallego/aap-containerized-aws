@@ -259,10 +259,23 @@
     state: present
   become: true
 
+- name: acme | Check for stale renewal virtualenv
+  ansible.builtin.stat:
+    path: /opt/aap-certs/venv/bin/python3.12
+  become: true
+  register: __letsencrypt_venv_python312
+
+- name: acme | Remove stale renewal virtualenv
+  ansible.builtin.file:
+    path: /opt/aap-certs/venv
+    state: absent
+  become: true
+  when: not __letsencrypt_venv_python312.stat.exists | default(false)
+
 - name: acme | Create renewal virtualenv with Python 3.12
   ansible.builtin.command:
     cmd: python3.12 -m venv /opt/aap-certs/venv
-    creates: /opt/aap-certs/venv/bin/python3
+    creates: /opt/aap-certs/venv/bin/python3.12
   become: true
 
 - name: acme | Upgrade pip in renewal virtualenv
