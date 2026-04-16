@@ -104,7 +104,7 @@
 
     - name: Create IAM role for certbot Route53 access
       amazon.aws.iam_role:
-        name: "{{ instance_name }}-certbot-route53"
+        name: "{{ instance_name }}-letsencrypt-route53"
         assume_role_policy_document:
           Version: "2012-10-17"
           Statement:
@@ -113,7 +113,7 @@
                 Service: ec2.amazonaws.com
               Action: sts:AssumeRole
         create_instance_profile: true
-        tags: "{{ common_tags | combine({'Name': instance_name + '-certbot-route53'}) }}"
+        tags: "{{ common_tags | combine({'Name': instance_name + '-letsencrypt-route53'}) }}"
         state: present
       register: certbot_iam_role
       when: __use_route53 | bool
@@ -121,8 +121,8 @@
     - name: Attach Route53 policy to certbot role
       amazon.aws.iam_policy:
         iam_type: role
-        iam_name: "{{ instance_name }}-certbot-route53"
-        policy_name: "{{ instance_name }}-certbot-route53-policy"
+        iam_name: "{{ instance_name }}-letsencrypt-route53"
+        policy_name: "{{ instance_name }}-letsencrypt-route53-policy"
         policy_json:
           Version: "2012-10-17"
           Statement:
@@ -163,7 +163,7 @@
             ebs:
               volume_size: "{{ volume_size }}"
               delete_on_termination: true
-        instance_role: "{{ (instance_name + '-certbot-route53') if (__use_route53 | bool) else omit }}"
+        instance_role: "{{ (instance_name + '-letsencrypt-route53') if (__use_route53 | bool) else omit }}"
         wait: true
         wait_timeout: 600
       register: ec2

@@ -117,18 +117,18 @@
       when: route53_hosted_zone_id | default('') | length > 0
       failed_when: false
 
-    - name: Delete IAM policy from certbot role
+    - name: Delete IAM policy from letsencrypt role
       amazon.aws.iam_policy:
         iam_type: role
-        iam_name: "{{ instance_name }}-certbot-route53"
-        policy_name: "{{ instance_name }}-certbot-route53-policy"
+        iam_name: "{{ instance_name }}-letsencrypt-route53"
+        policy_name: "{{ instance_name }}-letsencrypt-route53-policy"
         state: absent
       when: route53_hosted_zone_id | default('') | length > 0
       failed_when: false
 
-    - name: Delete IAM role and instance profile for certbot
+    - name: Delete IAM role and instance profile for letsencrypt
       amazon.aws.iam_role:
-        name: "{{ instance_name }}-certbot-route53"
+        name: "{{ instance_name }}-letsencrypt-route53"
         delete_instance_profile: true
         state: absent
       when: route53_hosted_zone_id | default('') | length > 0
@@ -155,6 +155,6 @@
           - Security groups and key pairs
           {% if route53_hosted_zone_id | default('') | length > 0 %}
           - Route53 A record: {{ installer_fqdn_hostname }}
-          - IAM role: {{ instance_name }}-certbot-route53
+          - IAM role: {{ instance_name }}-letsencrypt-route53
           {% endif %}
           - Local key files and inventory
