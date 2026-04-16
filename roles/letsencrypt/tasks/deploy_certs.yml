@@ -1,0 +1,72 @@
+---
+# Deploy certificates to running AAP services
+# Included from main.yml when letsencrypt_deploy_to_aap is true
+
+- name: deploy | Check if AAP gateway directory exists
+  ansible.builtin.stat:
+    path: "/home/{{ letsencrypt_aap_user }}/aap/gateway/etc"
+  register: __letsencrypt_gateway_dir
+
+- name: deploy | Deploy certificates to AAP gateway
+  when: __letsencrypt_gateway_dir.stat.exists | default(false)
+  become: true
+  block:
+    - name: deploy | Install certificate to AAP gateway
+      ansible.builtin.command: >-
+        install -o {{ letsencrypt_aap_user }} -g {{ letsencrypt_aap_user }}
+        -m {{ item.mode }}
+        {{ item.src }} {{ item.dest }}
+      loop:
+        - src: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+          dest: "/home/{{ letsencrypt_aap_user }}/aap/gateway/etc/gateway.cert"
+          mode: "0644"
+        - src: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
+          dest: "/home/{{ letsencrypt_aap_user }}/aap/gateway/etc/gateway.key"
+          mode: "0600"
+      changed_when: true
+
+    - name: deploy | Restart AAP gateway proxy
+      ansible.builtin.command: >-
+        runuser -l {{ letsencrypt_aap_user }}
+        -c 'systemctl --user restart automation-gateway-proxy'
+      changed_when: true
+
+- name: deploy | Check if MCP server directory exists
+  ansible.builtin.stat:
+    path: "/home/{{ letsencrypt_aap_user }}/aap/mcp/etc"
+  register: __letsencrypt_mcp_dir
+  when: letsencrypt_include_mcp | bool
+
+- name: deploy | Deploy certificates to MCP server
+  when:
+    - letsencrypt_include_mcp | bool
+    - __letsencrypt_mcp_dir.stat.exists | default(false)
+  become: true
+  block:
+    - name: deploy | Install certificate to MCP server
+      ansible.builtin.command: >-
+        install -o {{ letsencrypt_aap_user }} -g {{ letsencrypt_aap_user }}
+        -m {{ item.mode }}
+        {{ item.src }} {{ item.dest }}
+      loop:
+        - src: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+          dest: "/home/{{ letsencrypt_aap_user }}/aap/mcp/etc/mcp.cert"
+          mode: "0644"
+        - src: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
+          dest: "/home/{{ letsencrypt_aap_user }}/aap/mcp/etc/mcp.key"
+          mode: "0600"
+      changed_when: true
+
+    - name: deploy | Restart MCP server
+      ansible.builtin.command: >-
+        runuser -l {{ letsencrypt_aap_user }}
+        -c 'systemctl --user restart mcp'
+      changed_when: true
+
+- name: deploy | Display deployment result
+  ansible.builtin.debug:
+    msg:
+      - "Certificates deployed to AAP services"
+      - "Gateway: {{ 'deployed' if __letsencrypt_gateway_dir.stat.exists | default(false) else 'not found, skipped' }}"
+      - "MCP: {{ 'deployed' if (__letsencrypt_mcp_dir.stat.exists | default(false)) else 'not found or disabled, skipped' }}"
+    verbosity: 1
