@@ -384,7 +384,7 @@
 - name: acme | Display renewal dry-run result
   ansible.builtin.debug:
     msg: "Renewal dry-run completed successfully — cron setup is verified."
-    verbosity: 1
+    verbosity: 0
 
 - name: acme | Display provisioning result
   ansible.builtin.debug:
@@ -395,4 +395,4 @@
       - "Cert: {{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
       - "Key: {{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
       - "Auto-renewal: ansible-playbook via cron at 2:30 daily"
-    verbosity: 1
+    verbosity: 0

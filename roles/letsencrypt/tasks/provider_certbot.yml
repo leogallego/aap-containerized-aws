@@ -132,4 +132,4 @@
       - "Cert: {{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
       - "Key: {{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
       - "Auto-renewal: certbot renew via cron at 2:30 and 14:30 daily"
-    verbosity: 1
+    verbosity: 0

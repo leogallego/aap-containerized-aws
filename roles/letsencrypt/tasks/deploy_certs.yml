@@ -99,4 +99,4 @@
       - "Certificates deployed to AAP services"
       - "Gateway: {{ 'deployed and verified' if __letsencrypt_gateway_dir.stat.exists | default(false) else 'not found, skipped' }}"
       - "MCP: {{ 'deployed' if (__letsencrypt_mcp_dir.stat.exists | default(false)) else 'not found or disabled, skipped' }}"
-    verbosity: 1
+    verbosity: 0

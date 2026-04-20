@@ -28,7 +28,7 @@
       Provisioning Let's Encrypt certificate for {{ letsencrypt_domain }}
       using {{ letsencrypt_provider }} provider
       with {{ __letsencrypt_method | upper }}-01 challenge.
-    verbosity: 1
+    verbosity: 0
 
 - name: Provision certificate using {{ letsencrypt_provider }} provider
   ansible.builtin.include_tasks: "{{ role_path }}/tasks/provider_{{ letsencrypt_provider }}.yml"

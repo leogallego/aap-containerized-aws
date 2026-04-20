@@ -214,7 +214,7 @@
         msg: >-
           Route53 A record created: {{ installer_fqdn_hostname }} -> {{ public_ip }}.
           DNS propagation may take up to 60 seconds.
-        verbosity: 1
+        verbosity: 0
       when: __use_route53 | bool
 
     - name: Wait for SSH to become available
