@@ -109,6 +109,23 @@ This playbook sets `letsencrypt_deploy_to_aap: true`, so it issues the certifica
       letsencrypt_deploy_to_aap: true
 ```
 
+## AAP Upgrades and Installer Re-runs
+
+When upgrading AAP or re-running the installer, certificates are preserved automatically if you use the project playbooks (`deploy-aap.yml` or `install.yml`) — the inventory template includes the TLS paths and the letsencrypt role skips re-issuance when certs are still valid.
+
+If you re-run the AAP containerized installer manually (e.g., `./setup.sh`), include these lines in your inventory to keep the Let's Encrypt certificates:
+
+```ini
+gateway_tls_cert=/etc/letsencrypt/live/<your-domain>/fullchain.pem
+gateway_tls_key=/etc/letsencrypt/live/<your-domain>/privkey.pem
+
+# If using MCP server:
+mcp_tls_cert=/etc/letsencrypt/live/<your-domain>/fullchain.pem
+mcp_tls_key=/etc/letsencrypt/live/<your-domain>/privkey.pem
+```
+
+Without these settings, the installer regenerates self-signed certificates and the Let's Encrypt certs on disk go unused.
+
 ## Idempotency
 
 Both providers are idempotent:
