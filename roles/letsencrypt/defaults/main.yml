@@ -1,0 +1,34 @@
+---
+# Provider selection: 'acme' (default, pure Ansible) or 'certbot' (external binary)
+letsencrypt_provider: acme
+
+# Let's Encrypt account email (required)
+# letsencrypt_email:
+
+# Domain for the certificate — defaults to project-wide FQDN
+letsencrypt_domain: "{{ installer_fqdn_hostname | default('') }}"
+
+# Route53 hosted zone ID for DNS-01 challenge
+# If empty, HTTP-01 challenge is used instead
+letsencrypt_route53_zone_id: "{{ route53_hosted_zone_id | default('') }}"
+
+# ACME directory URL (change to staging for testing)
+# Staging: https://acme-staging-v02.api.letsencrypt.org/directory
+letsencrypt_acme_directory: https://acme-v02.api.letsencrypt.org/directory
+
+# Renew certificate when fewer than this many days remain
+letsencrypt_remaining_days: 30
+
+# Certificate storage paths
+letsencrypt_cert_dir: /etc/letsencrypt/live
+letsencrypt_acme_key_dir: /etc/letsencrypt/acme
+
+# Deploy certificates to running AAP services after obtaining them
+# Set to true when running standalone (post-install) or for renewal
+letsencrypt_deploy_to_aap: false
+
+# AAP user for service management (file ownership + systemctl)
+letsencrypt_aap_user: "{{ ansible_user | default('ec2-user') }}"
+
+# MCP server support (for cert deployment)
+letsencrypt_include_mcp: "{{ aap_include_mcp_server | default(false) | bool }}"

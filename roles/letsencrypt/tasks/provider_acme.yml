@@ -1,0 +1,398 @@
+---
+# ACME provider for Let's Encrypt certificate provisioning
+# Uses community.crypto.acme_certificate — no external binaries needed
+
+# --- Key and CSR generation ---
+
+- name: acme | Create ACME key directory
+  ansible.builtin.file:
+    path: "{{ letsencrypt_acme_key_dir }}"
+    state: directory
+    mode: '0700'
+  become: true
+
+- name: acme | Create certificate directory
+  ansible.builtin.file:
+    path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}"
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: acme | Generate ACME account key
+  community.crypto.openssl_privatekey:
+    path: "{{ letsencrypt_acme_key_dir }}/account.key"
+    size: 4096
+    mode: '0600'
+  become: true
+
+- name: acme | Check for certbot symlinks from previous provider
+  ansible.builtin.stat:
+    path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
+  become: true
+  register: __letsencrypt_privkey_stat
+
+- name: acme | Remove certbot symlinks if switching providers
+  ansible.builtin.file:
+    path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/{{ item }}"
+    state: absent
+  loop:
+    - privkey.pem
+    - fullchain.pem
+    - cert.pem
+    - chain.pem
+  become: true
+  when:
+    - __letsencrypt_privkey_stat.stat.exists | default(false)
+    - __letsencrypt_privkey_stat.stat.islnk | default(false)
+
+- name: acme | Generate certificate private key
+  community.crypto.openssl_privatekey:
+    path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
+    size: 2048
+    mode: '0600'
+    force: false
+  become: true
+
+- name: acme | Generate certificate signing request
+  community.crypto.openssl_csr:
+    path: "{{ letsencrypt_acme_key_dir }}/{{ letsencrypt_domain }}.csr"
+    privatekey_path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
+    common_name: "{{ letsencrypt_domain }}"
+    subject_alt_name:
+      - "DNS:{{ letsencrypt_domain }}"
+    force: false
+  become: true
+
+- name: acme | Register ACME account
+  community.crypto.acme_account:
+    account_key_src: "{{ letsencrypt_acme_key_dir }}/account.key"
+    state: present
+    terms_agreed: true
+    acme_directory: "{{ letsencrypt_acme_directory }}"
+    acme_version: 2
+    contact:
+      - "mailto:{{ letsencrypt_email }}"
+  become: true
+
+# --- Step 1: Request certificate / get challenge data ---
+
+- name: acme | Request certificate (step 1 — get challenge data)
+  community.crypto.acme_certificate:
+    account_key_src: "{{ letsencrypt_acme_key_dir }}/account.key"
+    csr: "{{ letsencrypt_acme_key_dir }}/{{ letsencrypt_domain }}.csr"
+    dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/cert.pem"
+    fullchain_dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+    chain_dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/chain.pem"
+    acme_directory: "{{ letsencrypt_acme_directory }}"
+    acme_version: 2
+    challenge: "{{ __letsencrypt_method }}-01"
+    remaining_days: "{{ letsencrypt_remaining_days }}"
+    modify_account: false
+  become: true
+  register: __letsencrypt_acme_challenge
+
+# --- DNS-01 challenge fulfillment ---
+
+- name: acme | Fulfill DNS-01 challenge
+  when:
+    - __letsencrypt_acme_challenge is changed
+    - __letsencrypt_method == 'dns'
+  block:
+    - name: acme | Create DNS-01 challenge TXT record
+      amazon.aws.route53:
+        state: present
+        zone: "{{ letsencrypt_route53_zone_id }}"
+        record: >-
+          {{ __letsencrypt_acme_challenge.challenge_data[letsencrypt_domain]['dns-01'].record }}
+        type: TXT
+        ttl: 60
+        value:
+          - >-
+            "{{ __letsencrypt_acme_challenge.challenge_data[letsencrypt_domain]['dns-01'].resource_value }}"
+        overwrite: true
+      delegate_to: localhost
+      become: false
+
+    - name: acme | Wait for DNS propagation
+      ansible.builtin.pause:
+        seconds: 30
+
+- name: acme | Complete ACME validation for DNS-01 (step 2)
+  community.crypto.acme_certificate:
+    account_key_src: "{{ letsencrypt_acme_key_dir }}/account.key"
+    csr: "{{ letsencrypt_acme_key_dir }}/{{ letsencrypt_domain }}.csr"
+    dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/cert.pem"
+    fullchain_dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+    chain_dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/chain.pem"
+    acme_directory: "{{ letsencrypt_acme_directory }}"
+    acme_version: 2
+    challenge: "{{ __letsencrypt_method }}-01"
+    remaining_days: "{{ letsencrypt_remaining_days }}"
+    data: "{{ __letsencrypt_acme_challenge }}"
+    modify_account: false
+  become: true
+  when:
+    - __letsencrypt_acme_challenge is changed
+    - __letsencrypt_method == 'dns'
+
+- name: acme | Clean up DNS-01 challenge TXT record
+  amazon.aws.route53:
+    state: absent
+    zone: "{{ letsencrypt_route53_zone_id }}"
+    record: >-
+      {{ __letsencrypt_acme_challenge.challenge_data[letsencrypt_domain]['dns-01'].record }}
+    type: TXT
+  delegate_to: localhost
+  become: false
+  when:
+    - __letsencrypt_acme_challenge is changed
+    - __letsencrypt_method == 'dns'
+  failed_when: false
+
+# --- HTTP-01 challenge fulfillment with block/always safety ---
+
+- name: acme | Fulfill HTTP-01 challenge and validate
+  when:
+    - __letsencrypt_acme_challenge is changed
+    - __letsencrypt_method == 'http'
+  block:
+    - name: acme | Check if port 80 is in use
+      ansible.builtin.command: ss -tlnp sport = :80
+      become: true
+      register: __letsencrypt_acme_port80
+      changed_when: false
+
+    - name: acme | Stop gateway proxy to free port 80
+      ansible.builtin.command: >-
+        runuser -l {{ letsencrypt_aap_user }}
+        -c 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user stop automation-gateway-proxy'
+      become: true
+      when: "'LISTEN' in __letsencrypt_acme_port80.stdout"
+      register: __letsencrypt_acme_gateway_stopped
+      changed_when: true
+
+    - name: acme | Create challenge response directory
+      ansible.builtin.file:
+        path: /tmp/acme-challenge/.well-known/acme-challenge
+        state: directory
+        mode: '0755'
+      become: true
+
+    - name: acme | Write challenge response file
+      ansible.builtin.copy:
+        content: >-
+          {{ __letsencrypt_acme_challenge.challenge_data[letsencrypt_domain]['http-01'].resource_value }}
+        dest: >-
+          /tmp/acme-challenge/{{ __letsencrypt_acme_challenge.challenge_data[letsencrypt_domain]['http-01'].resource }}
+        mode: '0644'
+      become: true
+
+    - name: acme | Start temporary HTTP server for challenge
+      ansible.builtin.command: python3 -m http.server 80 --directory /tmp/acme-challenge
+      become: true
+      async: 120
+      poll: 0
+      register: __letsencrypt_acme_http_server
+      changed_when: true
+
+    - name: acme | Wait for HTTP server to start
+      ansible.builtin.wait_for:
+        port: 80
+        delay: 2
+        timeout: 10
+
+    - name: acme | Complete ACME validation for HTTP-01 (step 2)
+      community.crypto.acme_certificate:
+        account_key_src: "{{ letsencrypt_acme_key_dir }}/account.key"
+        csr: "{{ letsencrypt_acme_key_dir }}/{{ letsencrypt_domain }}.csr"
+        dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/cert.pem"
+        fullchain_dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+        chain_dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/chain.pem"
+        acme_directory: "{{ letsencrypt_acme_directory }}"
+        acme_version: 2
+        challenge: "{{ __letsencrypt_method }}-01"
+        remaining_days: "{{ letsencrypt_remaining_days }}"
+        data: "{{ __letsencrypt_acme_challenge }}"
+        modify_account: false
+      become: true
+
+  always:
+    - name: acme | Stop temporary HTTP server
+      ansible.builtin.shell: >-
+        set -o pipefail;
+        pgrep -f 'python3.*http\.server.*80' | xargs -r kill || true
+      become: true
+      changed_when: false
+
+    - name: acme | Remove challenge response directory
+      ansible.builtin.file:
+        path: /tmp/acme-challenge
+        state: absent
+      become: true
+
+    - name: acme | Restart gateway proxy after HTTP challenge
+      ansible.builtin.command: >-
+        runuser -l {{ letsencrypt_aap_user }}
+        -c 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user start automation-gateway-proxy'
+      become: true
+      changed_when: true
+      when: __letsencrypt_acme_gateway_stopped is defined and __letsencrypt_acme_gateway_stopped is changed
+
+# --- Verify ---
+
+- name: acme | Verify certificate was obtained
+  ansible.builtin.stat:
+    path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+  register: __letsencrypt_acme_cert_check
+  become: true
+
+- name: acme | Fail if certificate was not obtained
+  ansible.builtin.fail:
+    msg: >-
+      ACME certificate was not obtained for {{ letsencrypt_domain }}.
+      Check the Ansible output above for error details.
+  when: not __letsencrypt_acme_cert_check.stat.exists
+
+- name: acme | Validate certificate content
+  community.crypto.x509_certificate_info:
+    path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+  become: true
+  register: __letsencrypt_acme_cert_info
+
+- name: acme | Fail if certificate is not for the expected domain
+  ansible.builtin.fail:
+    msg: >-
+      Certificate subject does not match expected domain {{ letsencrypt_domain }}.
+      Subject alt names: {{ __letsencrypt_acme_cert_info.subject_alt_name }}
+  when: >-
+    'DNS:' + letsencrypt_domain not in __letsencrypt_acme_cert_info.subject_alt_name
+
+- name: acme | Fail if certificate is already expired
+  ansible.builtin.fail:
+    msg: >-
+      Certificate for {{ letsencrypt_domain }} is already expired.
+      Not after: {{ __letsencrypt_acme_cert_info.not_after }}
+  when: __letsencrypt_acme_cert_info.expired
+
+# --- Renewal setup ---
+
+- name: acme | Install Python 3.12 for renewal virtualenv
+  ansible.builtin.dnf:
+    name:
+      - python3.12
+      - python3.12-pip
+    state: present
+  become: true
+
+- name: acme | Check for stale renewal virtualenv
+  ansible.builtin.stat:
+    path: "{{ __letsencrypt_renewal_venv }}/bin/python3.12"
+  become: true
+  register: __letsencrypt_venv_python312
+
+- name: acme | Remove stale renewal virtualenv
+  ansible.builtin.file:
+    path: "{{ __letsencrypt_renewal_venv }}"
+    state: absent
+  become: true
+  when: not __letsencrypt_venv_python312.stat.exists | default(false)
+
+- name: acme | Create renewal virtualenv with Python 3.12
+  ansible.builtin.command:
+    cmd: "python3.12 -m venv {{ __letsencrypt_renewal_venv }}"
+    creates: "{{ __letsencrypt_renewal_venv }}/bin/python3.12"
+  become: true
+
+- name: acme | Upgrade pip in renewal virtualenv
+  ansible.builtin.pip:
+    name: pip
+    state: latest
+    virtualenv: "{{ __letsencrypt_renewal_venv }}"
+  become: true
+
+- name: acme | Install ansible-core in renewal virtualenv
+  ansible.builtin.pip:
+    name:
+      - ansible-core>=2.16
+    virtualenv: "{{ __letsencrypt_renewal_venv }}"
+  become: true
+
+- name: acme | Install collections into renewal virtualenv
+  ansible.builtin.command: >-
+    {{ __letsencrypt_renewal_venv }}/bin/ansible-galaxy collection install {{ item }}
+  loop:
+    - community.crypto
+    - amazon.aws
+  changed_when: false
+  become: true
+
+- name: acme | Create renewal directory
+  ansible.builtin.file:
+    path: "{{ __letsencrypt_renewal_dir }}"
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: acme | Deploy renewal playbook
+  ansible.builtin.copy:
+    src: "{{ role_path }}/files/acme-renewal.yml"
+    dest: "{{ __letsencrypt_renewal_dir }}/renew.yml"
+    mode: '0644'
+  become: true
+
+- name: acme | Deploy renewal variables
+  ansible.builtin.template:
+    src: "{{ role_path }}/templates/acme-renewal-vars.yml.j2"
+    dest: "{{ __letsencrypt_renewal_dir }}/vars.yml"
+    mode: '0600'
+    backup: true
+  become: true
+
+- name: acme | Set up auto-renewal cron job
+  ansible.builtin.cron:
+    name: "letsencrypt-acme-renew"
+    minute: "30"
+    hour: "2"
+    job: >-
+      {{ __letsencrypt_renewal_venv }}/bin/ansible-playbook {{ __letsencrypt_renewal_dir }}/renew.yml
+      >> /var/log/aap-cert-renewal.log 2>&1
+    user: root
+  become: true
+
+# --- Renewal verification ---
+
+- name: acme | Verify cron job is registered
+  ansible.builtin.command: crontab -l -u root
+  become: true
+  register: __letsencrypt_cron_check
+  changed_when: false
+
+- name: acme | Fail if renewal cron job is missing
+  ansible.builtin.fail:
+    msg: >-
+      Renewal cron job 'letsencrypt-acme-renew' was not found in root's crontab.
+      Auto-renewal will not work.
+  when: "'letsencrypt-acme-renew' not in __letsencrypt_cron_check.stdout"
+
+- name: acme | Dry-run renewal playbook to verify setup
+  ansible.builtin.command: >-
+    {{ __letsencrypt_renewal_venv }}/bin/ansible-playbook {{ __letsencrypt_renewal_dir }}/renew.yml --check
+  become: true
+  register: __letsencrypt_renewal_dryrun
+  changed_when: false
+
+- name: acme | Display renewal dry-run result
+  ansible.builtin.debug:
+    msg: "Renewal dry-run completed successfully — cron setup is verified."
+    verbosity: 0
+
+- name: acme | Display provisioning result
+  ansible.builtin.debug:
+    msg:
+      - "Let's Encrypt certificate provisioned (acme provider)"
+      - "Domain: {{ letsencrypt_domain }}"
+      - "Method: {{ __letsencrypt_method | upper }}-01 challenge"
+      - "Cert: {{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+      - "Key: {{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
+      - "Auto-renewal: ansible-playbook via cron at 2:30 daily"
+    verbosity: 0

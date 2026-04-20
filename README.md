@@ -150,6 +150,41 @@ export AAP_INCLUDE_MCP_SERVER="true"
 export MCP_ALLOW_WRITE_OPERATIONS="true"  # Optional, default is read-only
 ```
 
+### SSL/TLS with Let's Encrypt
+
+Provision trusted Let's Encrypt certificates automatically during deployment. Two challenge methods are supported:
+
+**DNS-01 via Route53 (recommended — fully automated):**
+
+```bash
+export ENABLE_LETSENCRYPT="true"
+export LETSENCRYPT_EMAIL="you@example.com"
+export ROUTE53_HOSTED_ZONE_ID="Z0123456789"  # enables DNS-01
+export INSTALLER_FQDN_HOSTNAME="aap.yourdomain.com"
+```
+
+With Route53, the deployment is fully hands-off: infrastructure creation sets up the DNS A record and IAM permissions, then the letsencrypt role obtains the certificate via DNS challenge before AAP installation.
+
+**HTTP-01 (no Route53 — manual DNS step required):**
+
+```bash
+export ENABLE_LETSENCRYPT="true"
+export LETSENCRYPT_EMAIL="you@example.com"
+export INSTALLER_FQDN_HOSTNAME="aap.yourdomain.com"
+# ROUTE53_HOSTED_ZONE_ID is not set
+```
+
+Without Route53, create the DNS A record manually after infrastructure provisioning (step-by-step deployment required). Port 80 must be reachable.
+
+**Add SSL to an existing instance:**
+
+```bash
+ansible-playbook -i inventory/<instance>-hosts.yml \
+  playbooks/provision-letsencrypt.yml -e @extra-vars.yml
+```
+
+See the [letsencrypt role README](roles/letsencrypt/README.md) for full details on providers, variables, and renewal.
+
 ### Optional Configuration
 
 ```bash
@@ -164,7 +199,7 @@ export BUNDLE_INSTALL="true"        # Use bundle install
 ## Access
 
 After deployment:
-- **Web Interface:** `https://<public-ip>`
+- **Web Interface:** `https://<public-ip>` (or `https://<fqdn>` if SSL is enabled)
 - **Username:** `admin`
 - **Password:** Value from `INSTALLER_ADMIN_PW`
 

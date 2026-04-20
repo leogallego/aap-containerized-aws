@@ -1,0 +1,235 @@
+---
+# ACME certificate renewal playbook
+# Deployed by the letsencrypt role — do not edit manually
+# Run by cron: ansible-playbook /opt/aap-certs/renew.yml
+
+- name: Renew Let's Encrypt ACME certificate
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+
+  vars_files:
+    - vars.yml
+
+  tasks:
+    # --- Check if renewal is needed ---
+
+    - name: Generate CSR for renewal check
+      community.crypto.openssl_csr:
+        path: "{{ letsencrypt_acme_key_dir }}/{{ letsencrypt_domain }}.csr"
+        privatekey_path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
+        common_name: "{{ letsencrypt_domain }}"
+        subject_alt_name:
+          - "DNS:{{ letsencrypt_domain }}"
+
+    - name: Check certificate and request renewal if needed
+      community.crypto.acme_certificate:
+        account_key_src: "{{ letsencrypt_acme_key_dir }}/account.key"
+        csr: "{{ letsencrypt_acme_key_dir }}/{{ letsencrypt_domain }}.csr"
+        dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/cert.pem"
+        fullchain_dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+        chain_dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/chain.pem"
+        acme_directory: "{{ letsencrypt_acme_directory }}"
+        acme_version: 2
+        challenge: "{{ letsencrypt_method }}-01"
+        remaining_days: "{{ letsencrypt_remaining_days }}"
+        modify_account: false
+      register: __renewal_challenge
+
+    # --- DNS-01 challenge ---
+
+    - name: Fulfill DNS-01 challenge
+      when:
+        - __renewal_challenge is changed
+        - letsencrypt_method == 'dns'
+      block:
+        - name: Create DNS-01 challenge TXT record
+          amazon.aws.route53:
+            state: present
+            zone: "{{ letsencrypt_route53_zone_id }}"
+            record: >-
+              {{ __renewal_challenge.challenge_data[letsencrypt_domain]['dns-01'].record }}
+            type: TXT
+            ttl: 60
+            value:
+              - >-
+                "{{ __renewal_challenge.challenge_data[letsencrypt_domain]['dns-01'].resource_value }}"
+            overwrite: true
+
+        - name: Wait for DNS propagation
+          ansible.builtin.pause:
+            seconds: 30
+
+    - name: Complete ACME validation for DNS-01
+      community.crypto.acme_certificate:
+        account_key_src: "{{ letsencrypt_acme_key_dir }}/account.key"
+        csr: "{{ letsencrypt_acme_key_dir }}/{{ letsencrypt_domain }}.csr"
+        dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/cert.pem"
+        fullchain_dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+        chain_dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/chain.pem"
+        acme_directory: "{{ letsencrypt_acme_directory }}"
+        acme_version: 2
+        challenge: "{{ letsencrypt_method }}-01"
+        remaining_days: "{{ letsencrypt_remaining_days }}"
+        data: "{{ __renewal_challenge }}"
+        modify_account: false
+      when:
+        - __renewal_challenge is changed
+        - letsencrypt_method == 'dns'
+
+    - name: Clean up DNS TXT record
+      amazon.aws.route53:
+        state: absent
+        zone: "{{ letsencrypt_route53_zone_id }}"
+        record: >-
+          {{ __renewal_challenge.challenge_data[letsencrypt_domain]['dns-01'].record }}
+        type: TXT
+      when:
+        - __renewal_challenge is changed
+        - letsencrypt_method == 'dns'
+      failed_when: false
+
+    # --- HTTP-01 challenge (block/always for gateway safety) ---
+
+    - name: Fulfill HTTP-01 challenge and validate
+      when:
+        - __renewal_challenge is changed
+        - letsencrypt_method == 'http'
+      block:
+        - name: Check if port 80 is in use
+          ansible.builtin.command: ss -tlnp sport = :80
+          register: __port80_check
+          changed_when: false
+
+        - name: Stop gateway proxy to free port 80
+          ansible.builtin.command: >-
+            runuser -l {{ letsencrypt_aap_user }}
+            -c 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user stop automation-gateway-proxy'
+          changed_when: true
+          when: "'LISTEN' in __port80_check.stdout"
+          register: __gateway_stopped
+
+        - name: Create challenge response directory
+          ansible.builtin.file:
+            path: /tmp/acme-challenge/.well-known/acme-challenge
+            state: directory
+            mode: '0755'
+
+        - name: Write challenge response file
+          ansible.builtin.copy:
+            content: >-
+              {{ __renewal_challenge.challenge_data[letsencrypt_domain]['http-01'].resource_value }}
+            dest: >-
+              /tmp/acme-challenge/{{ __renewal_challenge.challenge_data[letsencrypt_domain]['http-01'].resource }}
+            mode: '0644'
+
+        - name: Start temporary HTTP server
+          ansible.builtin.command: python3 -m http.server 80 --directory /tmp/acme-challenge
+          async: 120
+          poll: 0
+          register: __http_server
+          changed_when: true
+
+        - name: Wait for HTTP server to start
+          ansible.builtin.wait_for:
+            port: 80
+            delay: 2
+            timeout: 10
+
+        - name: Complete ACME validation for HTTP-01
+          community.crypto.acme_certificate:
+            account_key_src: "{{ letsencrypt_acme_key_dir }}/account.key"
+            csr: "{{ letsencrypt_acme_key_dir }}/{{ letsencrypt_domain }}.csr"
+            dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/cert.pem"
+            fullchain_dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+            chain_dest: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/chain.pem"
+            acme_directory: "{{ letsencrypt_acme_directory }}"
+            acme_version: 2
+            challenge: "{{ letsencrypt_method }}-01"
+            remaining_days: "{{ letsencrypt_remaining_days }}"
+            data: "{{ __renewal_challenge }}"
+            modify_account: false
+
+      always:
+        - name: Stop temporary HTTP server
+          ansible.builtin.shell: >-
+            set -o pipefail;
+            pgrep -f 'python3.*http\.server.*80' | xargs -r kill || true
+          changed_when: false
+
+        - name: Remove challenge directory
+          ansible.builtin.file:
+            path: /tmp/acme-challenge
+            state: absent
+
+        - name: Restart gateway proxy
+          ansible.builtin.command: >-
+            runuser -l {{ letsencrypt_aap_user }}
+            -c 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user start automation-gateway-proxy'
+          changed_when: true
+          when: __gateway_stopped is defined and __gateway_stopped is changed
+
+    # --- Deploy renewed certificates ---
+
+    - name: Deploy renewed certificates to AAP gateway
+      when: __renewal_challenge is changed
+      block:
+        - name: Check if gateway directory exists
+          ansible.builtin.stat:
+            path: "/home/{{ letsencrypt_aap_user }}/aap/gateway/etc"
+          register: __gateway_dir
+
+        - name: Install renewed certificate to gateway
+          ansible.builtin.command: >-
+            install -o {{ letsencrypt_aap_user }} -g {{ letsencrypt_aap_user }}
+            -m {{ item.mode }}
+            {{ item.src }} {{ item.dest }}
+          loop:
+            - src: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+              dest: "/home/{{ letsencrypt_aap_user }}/aap/gateway/etc/gateway.cert"
+              mode: "0644"
+            - src: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
+              dest: "/home/{{ letsencrypt_aap_user }}/aap/gateway/etc/gateway.key"
+              mode: "0600"
+          changed_when: true
+          when: __gateway_dir.stat.exists | default(false)
+
+        - name: Restart gateway proxy with renewed certificate
+          ansible.builtin.command: >-
+            runuser -l {{ letsencrypt_aap_user }}
+            -c 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user restart automation-gateway-proxy'
+          changed_when: true
+          when: __gateway_dir.stat.exists | default(false)
+
+    - name: Deploy renewed certificates to MCP server
+      when:
+        - __renewal_challenge is changed
+        - letsencrypt_include_mcp | bool
+      block:
+        - name: Check if MCP directory exists
+          ansible.builtin.stat:
+            path: "/home/{{ letsencrypt_aap_user }}/aap/mcp/etc"
+          register: __mcp_dir
+
+        - name: Install renewed certificate to MCP server
+          ansible.builtin.command: >-
+            install -o {{ letsencrypt_aap_user }} -g {{ letsencrypt_aap_user }}
+            -m {{ item.mode }}
+            {{ item.src }} {{ item.dest }}
+          loop:
+            - src: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+              dest: "/home/{{ letsencrypt_aap_user }}/aap/mcp/etc/mcp.cert"
+              mode: "0644"
+            - src: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
+              dest: "/home/{{ letsencrypt_aap_user }}/aap/mcp/etc/mcp.key"
+              mode: "0600"
+          changed_when: true
+          when: __mcp_dir.stat.exists | default(false)
+
+        - name: Restart MCP server with renewed certificate
+          ansible.builtin.command: >-
+            runuser -l {{ letsencrypt_aap_user }}
+            -c 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user restart mcp'
+          changed_when: true
+          when: __mcp_dir.stat.exists | default(false)

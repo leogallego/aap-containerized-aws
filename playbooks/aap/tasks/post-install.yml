@@ -16,7 +16,7 @@
     user: "admin"
     password: "{{ installer_admin_pw }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ enable_letsencrypt | default(false) | bool }}"
   register: api_check
   retries: 12
   delay: 30
@@ -33,7 +33,7 @@
     user: "admin"
     password: "{{ installer_admin_pw }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ enable_letsencrypt | default(false) | bool }}"
   register: aap_version_info
   ignore_errors: true
 
@@ -44,7 +44,7 @@
     user: "admin"
     password: "{{ installer_admin_pw }}"
     force_basic_auth: true
-    validate_certs: false
+    validate_certs: "{{ enable_letsencrypt | default(false) | bool }}"
   register: config_result
   retries: 3
   delay: 10

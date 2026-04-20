@@ -4,6 +4,29 @@
 # Usage: source env-vars.sh
 
 #=============================================================================
+# CLEAN SLATE — unset all project variables to prevent stale values
+# leaking across instances when switching env-vars files
+#=============================================================================
+unset AWS_REGION AWS_PROFILE \
+  AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_CREDENTIAL_EXPIRATION \
+  INSTANCE_NAME INSTANCE_TYPE OWNER \
+  REDHAT_REGISTRY_USERNAME REDHAT_REGISTRY_PASSWORD \
+  INSTALLER_ADMIN_PASSWORD INSTALLER_FQDN_HOSTNAME INSTALLER_DIRECTORY \
+  AAP_INCLUDE_CONTROLLER AAP_INCLUDE_EDA_CONTROLLER AAP_INCLUDE_AUTOMATION_HUB \
+  AAP_INCLUDE_LIGHTSPEED AAP_INCLUDE_MCP_SERVER \
+  AAP_DATABASE_HOST AAP_DATABASE_NAME AAP_DATABASE_USERNAME AAP_DATABASE_PASSWORD \
+  AAP_CACHE_HOST AAP_CACHE_PASSWORD \
+  ENABLE_LETSENCRYPT LETSENCRYPT_EMAIL LETSENCRYPT_PROVIDER ROUTE53_HOSTED_ZONE_ID \
+  LIGHTSPEED_ADMIN_USER LIGHTSPEED_ADMIN_EMAIL \
+  LIGHTSPEED_CHATBOT_MODEL_URL LIGHTSPEED_CHATBOT_MODEL_API_KEY LIGHTSPEED_CHATBOT_MODEL_ID \
+  LIGHTSPEED_MCP_CONTROLLER_ENABLED LIGHTSPEED_MCP_LIGHTSPEED_ENABLED \
+  MCP_ALLOW_WRITE_OPERATIONS \
+  SKIP_SYSTEM_UPDATE BUNDLE_INSTALL \
+  INSTALL_PRODUCT_DEMOS PRODUCT_DEMOS_REPO_URL PRODUCT_DEMOS_REPO_VERSION \
+  VPC_CIDR SUBNET_CIDR SSH_KEY_NAME \
+  2>/dev/null
+
+#=============================================================================
 # AWS CONFIGURATION
 #=============================================================================
 
@@ -24,8 +47,6 @@ export AWS_REGION="us-east-1"
 #
 export AWS_PROFILE="aap-deploy"
 
-# IMPORTANT: Unset any static credentials that would override the profile
-unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_CREDENTIAL_EXPIRATION 2>/dev/null
 
 # Legacy: Static credentials (NOT recommended - tokens expire after ~20 min)
 # export AWS_ACCESS_KEY_ID="your-access-key-here"
@@ -92,6 +113,25 @@ export LIGHTSPEED_CHATBOT_MODEL_ID=""         # Your model ID
 export MCP_ALLOW_WRITE_OPERATIONS="false"
 
 #=============================================================================
+# SSL/TLS CONFIGURATION (Let's Encrypt)
+#=============================================================================
+
+# Enable Let's Encrypt SSL certificates (default: false)
+# When enabled, provisions trusted TLS certificates before AAP installation
+# Requires: INSTALLER_FQDN_HOSTNAME set to a real domain with DNS A record
+# pointing to the EC2 instance public IP
+export ENABLE_LETSENCRYPT="false"
+
+# Email for Let's Encrypt certificate notifications (required if ENABLE_LETSENCRYPT=true)
+export LETSENCRYPT_EMAIL="your-email@example.com"
+
+# AWS Route53 Hosted Zone ID (optional)
+# If set: automates DNS A record creation and uses DNS-01 challenge (recommended)
+# If empty: user must create DNS A record manually, uses HTTP-01 challenge
+# Find your zone ID: aws route53 list-hosted-zones --query 'HostedZones[].{Id:Id,Name:Name}'
+# export ROUTE53_HOSTED_ZONE_ID="Z0123456789ABCDEFGHIJ"
+
+#=============================================================================
 # SETUP BUNDLE CONFIGURATION
 #=============================================================================
 
@@ -149,6 +189,7 @@ echo "- Hub: ${AAP_INCLUDE_AUTOMATION_HUB}"
 echo "- Lightspeed: ${AAP_INCLUDE_LIGHTSPEED}"
 echo "- MCP Server: ${AAP_INCLUDE_MCP_SERVER}"
 echo "- Install Product Demos: ${INSTALL_PRODUCT_DEMOS}"
+echo "- Let's Encrypt: ${ENABLE_LETSENCRYPT:-false}"
 echo ""
 echo "Red Hat Registry configured: $([ -n "${REDHAT_REGISTRY_USERNAME}" ] && echo "✓" || echo "✗")"
 echo "Admin password set: $([ -n "${INSTALLER_ADMIN_PASSWORD}" ] && echo "✓" || echo "✗")"

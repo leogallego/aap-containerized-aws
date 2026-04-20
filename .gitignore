@@ -15,8 +15,8 @@ files/*-key.pem
 files/*.key
 
 # Generated Inventory and Instance Information
-inventory/hosts.yml
-inventory/hosts
+inventory/*
+!inventory/hosts.yml.sample
 files/*-info.txt
 files/instance-*.txt
 
@@ -40,6 +40,7 @@ files/generated-*
 *.retry
 .ansible/
 ansible.cfg
+collections/
 
 # Log Files
 *.log
@@ -100,8 +101,14 @@ Thumbs.db
 # Allow .gitkeep files to track empty directories
 !.gitkeep
 
+# AWS credential scripts
+aws.sh
+
+# Git Worktrees
+.worktrees/
+
 # Custom ignore patterns
 # Add your specific files here
 # Example:
 # my-custom-secrets.yml
-# local-override.yml 
+# local-override.yml

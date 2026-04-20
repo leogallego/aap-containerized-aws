@@ -123,6 +123,18 @@ gateway_admin_password={{ installer_admin_pw }}
 gateway_pg_host={{ installer_fqdn_hostname }}
 gateway_pg_password={{ installer_admin_pw }}
 
+{% if enable_letsencrypt|default(false)|bool %}
+# TLS Certificates (Let's Encrypt)
+# IMPORTANT: preserve these settings when manually re-running the installer
+# for upgrades or updates — otherwise AAP reverts to self-signed certificates.
+gateway_tls_cert=/etc/letsencrypt/live/{{ installer_fqdn_hostname }}/fullchain.pem
+gateway_tls_key=/etc/letsencrypt/live/{{ installer_fqdn_hostname }}/privkey.pem
+{% if aap_include_mcp_server|bool %}
+mcp_tls_cert=/etc/letsencrypt/live/{{ installer_fqdn_hostname }}/fullchain.pem
+mcp_tls_key=/etc/letsencrypt/live/{{ installer_fqdn_hostname }}/privkey.pem
+{% endif %}
+{% endif %}
+
 {% if aap_include_mcp_server|bool %}
 # Ansible MCP server permissions
 # To enable read-write access, set the "mcp_allow_write_operations" variable to "true"

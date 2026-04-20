@@ -1,0 +1,27 @@
+---
+# Provision Let's Encrypt SSL certificates on any host
+# Works on fresh VMs and running AAP instances alike
+#
+# Usage:
+#   source env-vars.sh
+#   ansible-playbook -i inventory/<instance-name>-hosts.yml \
+#     playbooks/provision-letsencrypt.yml -e @extra-vars.yml
+#
+# Required variables:
+#   - installer_fqdn_hostname: domain name for the certificate
+#   - letsencrypt_email: email for Let's Encrypt notifications
+#
+# Optional variables:
+#   - letsencrypt_provider: 'acme' (default) or 'certbot'
+#   - route53_hosted_zone_id: if set, uses DNS-01 challenge (recommended)
+#     if empty, uses HTTP-01 standalone challenge
+
+- name: Provision Let's Encrypt SSL certificates
+  hosts: all
+  gather_facts: true
+  vars_files:
+    - "{{ project_root | default(playbook_dir + '/..') }}/extra-vars.yml"
+
+  roles:
+    - role: letsencrypt
+      letsencrypt_deploy_to_aap: true

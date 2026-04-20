@@ -151,6 +151,11 @@
     dest: "/tmp/aap_install_metadata_{{ ansible_date_time.date }}.txt"
     mode: '0644'
 
+- name: Provision Let's Encrypt certificates
+  ansible.builtin.include_role:
+    name: letsencrypt
+  when: enable_letsencrypt | default(false) | bool
+
 - name: Check if installer directory exists
   ansible.builtin.stat:
     path: "{{ installer_directory }}"
