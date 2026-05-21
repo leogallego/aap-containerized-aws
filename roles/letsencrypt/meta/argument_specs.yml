@@ -12,10 +12,9 @@ argument_specs:
       letsencrypt_provider:
         type: str
         default: acme
-        choices:
-          - acme
-          - certbot
-        description: Certificate provisioning provider.
+        description: >-
+          Certificate provisioning provider. Built-in: 'acme', 'certbot'.
+          Extensible by adding tasks/provider_<name>.yml.
 
       letsencrypt_email:
         type: str
@@ -34,11 +33,53 @@ argument_specs:
           Route53 hosted zone ID for DNS-01 challenge.
           If empty, HTTP-01 challenge is used.
 
+      letsencrypt_use_production:
+        type: bool
+        default: false
+        description: >-
+          Use Let's Encrypt production directory. Default is false (staging).
+          Staging certificates are valid but not trusted by browsers.
+          Production has strict rate limits (50 certs/domain/week).
+
       letsencrypt_acme_directory:
         type: str
-        default: https://acme-v02.api.letsencrypt.org/directory
+        default: https://acme-staging-v02.api.letsencrypt.org/directory
         description: >-
-          ACME directory URL. Use staging URL for testing.
+          ACME directory URL. Derived from letsencrypt_use_production by default.
+          Override to use a custom ACME-compatible CA.
+
+      letsencrypt_force_reissue:
+        type: bool
+        default: false
+        description: >-
+          Force certificate reissue even when an existing production
+          certificate would be replaced by a staging one. Use when
+          intentionally switching from production to staging.
+
+      letsencrypt_key_type:
+        type: str
+        default: rsa
+        choices:
+          - rsa
+          - ecc
+        description: >-
+          Certificate key type. RSA is the default and widely tested with AAP.
+          ECC (ECDSA) keys are faster and smaller but less tested with AAP.
+
+      letsencrypt_key_size:
+        type: int
+        default: 2048
+        description: RSA key size in bits. Only used when letsencrypt_key_type is 'rsa'.
+
+      letsencrypt_key_curve:
+        type: str
+        default: secp256r1
+        choices:
+          - secp256r1
+          - secp384r1
+        description: >-
+          ECC curve name. Only used when letsencrypt_key_type is 'ecc'.
+          secp521r1 is not supported by Let's Encrypt.
 
       letsencrypt_remaining_days:
         type: int

@@ -30,10 +30,14 @@ ansible-galaxy collection install -r requirements.yml -p collections
 See `defaults/main.yml` for all variables. Key inputs:
 
 ```yaml
-letsencrypt_provider: acme          # or 'certbot'
+letsencrypt_provider: acme          # or 'certbot' (extensible via provider_<name>.yml)
 letsencrypt_email: you@example.com  # required
 letsencrypt_domain: aap.example.com # required (defaults to installer_fqdn_hostname)
 letsencrypt_route53_zone_id: ""     # set for DNS-01, empty for HTTP-01
+letsencrypt_use_production: false   # false = staging (safe for dev), true = production
+letsencrypt_key_type: rsa           # 'rsa' (default) or 'ecc' (ECDSA)
+letsencrypt_key_size: 2048          # RSA key size (only when key_type is 'rsa')
+letsencrypt_key_curve: secp256r1    # ECC curve (only when key_type is 'ecc')
 letsencrypt_deploy_to_aap: false    # true for standalone/post-install use
 letsencrypt_include_mcp: false      # also deploy certs to MCP server
 ```
@@ -46,6 +50,7 @@ This is the fully automated path. Set these env vars before deploying:
 
 ```bash
 export ENABLE_LETSENCRYPT="true"
+export LETSENCRYPT_USE_PRODUCTION="true"
 export LETSENCRYPT_EMAIL="you@example.com"
 export ROUTE53_HOSTED_ZONE_ID="Z0123456789"
 export INSTALLER_FQDN_HOSTNAME="aap.yourdomain.com"
@@ -159,15 +164,27 @@ Both providers set up automatic renewal via cron:
 
 Renewal includes automatic certificate deployment to the gateway (and MCP if enabled).
 
-## Testing with staging
+## Staging vs Production
 
-Set `letsencrypt_acme_directory` to the staging URL to avoid rate limits during development:
+The role defaults to the Let's Encrypt **staging** directory (`letsencrypt_use_production: false`). Staging certificates are functionally identical but not trusted by browsers. This prevents accidental rate-limit hits during development (Let's Encrypt production allows 50 certificates per domain per week).
+
+When ready for browser-trusted certificates:
 
 ```yaml
-letsencrypt_acme_directory: https://acme-staging-v02.api.letsencrypt.org/directory
+letsencrypt_use_production: true
 ```
 
-Staging certificates are functionally identical but not trusted by browsers. Let's Encrypt production has strict rate limits (50 certificates per domain per week).
+Or via environment variable:
+
+```bash
+export LETSENCRYPT_USE_PRODUCTION="true"
+```
+
+You can also override the ACME directory URL directly for custom ACME-compatible CAs:
+
+```yaml
+letsencrypt_acme_directory: https://acme.example.com/directory
+```
 
 ## License
 

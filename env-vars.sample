@@ -16,7 +16,7 @@ unset AWS_REGION AWS_PROFILE \
   AAP_INCLUDE_LIGHTSPEED AAP_INCLUDE_MCP_SERVER \
   AAP_DATABASE_HOST AAP_DATABASE_NAME AAP_DATABASE_USERNAME AAP_DATABASE_PASSWORD \
   AAP_CACHE_HOST AAP_CACHE_PASSWORD \
-  ENABLE_LETSENCRYPT LETSENCRYPT_EMAIL LETSENCRYPT_PROVIDER ROUTE53_HOSTED_ZONE_ID \
+  ENABLE_LETSENCRYPT LETSENCRYPT_EMAIL LETSENCRYPT_PROVIDER LETSENCRYPT_USE_PRODUCTION LETSENCRYPT_KEY_TYPE ROUTE53_HOSTED_ZONE_ID \
   LIGHTSPEED_ADMIN_USER LIGHTSPEED_ADMIN_EMAIL \
   LIGHTSPEED_CHATBOT_MODEL_URL LIGHTSPEED_CHATBOT_MODEL_API_KEY LIGHTSPEED_CHATBOT_MODEL_ID \
   LIGHTSPEED_MCP_CONTROLLER_ENABLED LIGHTSPEED_MCP_LIGHTSPEED_ENABLED \
@@ -124,6 +124,16 @@ export ENABLE_LETSENCRYPT="false"
 
 # Email for Let's Encrypt certificate notifications (required if ENABLE_LETSENCRYPT=true)
 export LETSENCRYPT_EMAIL="your-email@example.com"
+
+# Use Let's Encrypt production directory (default: false = staging)
+# Staging issues valid but untrusted certificates — safe for development/testing
+# Production has strict rate limits: 50 certificates per domain per week
+# Set to "true" only when you are ready for browser-trusted certificates
+# export LETSENCRYPT_USE_PRODUCTION="false"
+
+# Certificate key type (default: rsa)
+# Set to "ecc" for ECDSA keys (faster, smaller, but less tested with AAP)
+# export LETSENCRYPT_KEY_TYPE="rsa"
 
 # AWS Route53 Hosted Zone ID (optional)
 # If set: automates DNS A record creation and uses DNS-01 challenge (recommended)

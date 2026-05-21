@@ -76,6 +76,10 @@ route53_hosted_zone_id: >-
   {{ lookup('env', 'ROUTE53_HOSTED_ZONE_ID') | default('', true) }}
 letsencrypt_provider: >-
   {{ lookup('env', 'LETSENCRYPT_PROVIDER') | default('acme', true) }}
+letsencrypt_use_production: >-
+  {{ lookup('env', 'LETSENCRYPT_USE_PRODUCTION') | default('false', true) | bool }}
+letsencrypt_key_type: >-
+  {{ lookup('env', 'LETSENCRYPT_KEY_TYPE') | default('rsa', true) }}
 
 # MCP Server Configuration
 mcp_allow_write_operations: >-

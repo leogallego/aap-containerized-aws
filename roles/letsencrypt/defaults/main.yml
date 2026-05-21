@@ -12,9 +12,29 @@ letsencrypt_domain: "{{ installer_fqdn_hostname | default('') }}"
 # If empty, HTTP-01 challenge is used instead
 letsencrypt_route53_zone_id: "{{ route53_hosted_zone_id | default('') }}"
 
-# ACME directory URL (change to staging for testing)
-# Staging: https://acme-staging-v02.api.letsencrypt.org/directory
-letsencrypt_acme_directory: https://acme-v02.api.letsencrypt.org/directory
+# Use Let's Encrypt production directory (default: false = staging)
+# Staging issues valid but untrusted certificates — safe for development
+# Production has strict rate limits: 50 certificates per domain per week
+letsencrypt_use_production: false
+
+# ACME directory URL (derived from letsencrypt_use_production)
+letsencrypt_acme_directory: >-
+  {{ (letsencrypt_use_production | bool)
+     | ternary('https://acme-v02.api.letsencrypt.org/directory',
+               'https://acme-staging-v02.api.letsencrypt.org/directory') }}
+
+# Force certificate reissue even when downgrading from production to staging
+letsencrypt_force_reissue: false
+
+# Certificate key type: 'rsa' (default) or 'ecc'
+# ECC keys are faster and smaller but untested with all AAP components
+letsencrypt_key_type: rsa
+
+# ECC curve (only used when letsencrypt_key_type is 'ecc')
+letsencrypt_key_curve: secp256r1
+
+# RSA key size (only used when letsencrypt_key_type is 'rsa')
+letsencrypt_key_size: 2048
 
 # Renew certificate when fewer than this many days remain
 letsencrypt_remaining_days: 30

@@ -1,0 +1,7 @@
+---
+- name: Fail on unknown provider
+  ansible.builtin.fail:
+    msg: >-
+      Unknown letsencrypt_provider '{{ letsencrypt_provider }}'.
+      Supported providers: add a tasks/provider_<name>.yml file
+      or use 'acme' (default) or 'certbot'.

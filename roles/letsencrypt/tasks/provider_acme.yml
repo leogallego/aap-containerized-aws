@@ -55,13 +55,25 @@
     - __letsencrypt_privkey_stat.stat.exists | default(false)
     - __letsencrypt_privkey_stat.stat.islnk | default(false)
 
-- name: acme | Generate certificate private key
+- name: acme | Generate certificate private key (RSA)
   community.crypto.openssl_privatekey:
     path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
-    size: 2048
+    type: RSA
+    size: "{{ letsencrypt_key_size }}"
     mode: '0600'
     force: false
   become: true
+  when: letsencrypt_key_type | lower == 'rsa'
+
+- name: acme | Generate certificate private key (ECC)
+  community.crypto.openssl_privatekey:
+    path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
+    type: ECC
+    curve: "{{ letsencrypt_key_curve }}"
+    mode: '0600'
+    force: false
+  become: true
+  when: letsencrypt_key_type | lower == 'ecc'
 
 - name: acme | Generate certificate signing request
   community.crypto.openssl_csr:
@@ -414,6 +426,7 @@
     msg:
       - "Let's Encrypt certificate provisioned (acme provider)"
       - "Domain: {{ letsencrypt_domain }}"
+      - "Key type: {{ letsencrypt_key_type | upper }}{{ (letsencrypt_key_type | lower == 'ecc') | ternary(' ' + letsencrypt_key_curve, ' ' + (letsencrypt_key_size | string) + '-bit') }}"
       - "Method: {{ __letsencrypt_method | upper }}-01 challenge"
       - "Cert: {{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
       - "Key: {{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"

@@ -39,6 +39,8 @@
     --agree-tos
     --email {{ letsencrypt_email }}
     -d {{ letsencrypt_domain }}
+    --key-type {{ (letsencrypt_key_type | lower == 'ecc') | ternary('ecdsa', 'rsa') }}
+    {{ (letsencrypt_key_type | lower == 'ecc') | ternary('--elliptic-curve ' + letsencrypt_key_curve, '--rsa-key-size ' + (letsencrypt_key_size | string)) }}
   become: true
   register: __letsencrypt_dns_result
   changed_when: >-
@@ -74,6 +76,8 @@
     --agree-tos
     --email {{ letsencrypt_email }}
     -d {{ letsencrypt_domain }}
+    --key-type {{ (letsencrypt_key_type | lower == 'ecc') | ternary('ecdsa', 'rsa') }}
+    {{ (letsencrypt_key_type | lower == 'ecc') | ternary('--elliptic-curve ' + letsencrypt_key_curve, '--rsa-key-size ' + (letsencrypt_key_size | string)) }}
     {{ __letsencrypt_certbot_pre_hook | default('') }}
     {{ __letsencrypt_certbot_post_hook | default('') }}
   become: true
@@ -128,6 +132,7 @@
     msg:
       - "Let's Encrypt certificate provisioned (certbot provider)"
       - "Domain: {{ letsencrypt_domain }}"
+      - "Key type: {{ letsencrypt_key_type | upper }}{{ (letsencrypt_key_type | lower == 'ecc') | ternary(' ' + letsencrypt_key_curve, ' ' + (letsencrypt_key_size | string) + '-bit') }}"
       - "Method: {{ __letsencrypt_method | upper }}-01 challenge"
       - "Cert: {{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
       - "Key: {{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"

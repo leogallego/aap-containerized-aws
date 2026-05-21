@@ -10,28 +10,76 @@
       letsencrypt_domain cannot be the default 'aap.example.org'.
       Set LETSENCRYPT_EMAIL and INSTALLER_FQDN_HOSTNAME in env-vars.sh.
 
-- name: Validate provider selection
+- name: Validate key type selection
   ansible.builtin.assert:
     that:
-      - letsencrypt_provider in ['acme', 'certbot']
+      - letsencrypt_key_type | lower in ['rsa', 'ecc']
     fail_msg: >-
-      letsencrypt_provider must be 'acme' or 'certbot',
-      got '{{ letsencrypt_provider }}'.
+      letsencrypt_key_type must be 'rsa' or 'ecc',
+      got '{{ letsencrypt_key_type }}'.
 
 - name: Determine challenge method
   ansible.builtin.set_fact:
     __letsencrypt_method: "{{ 'dns' if (letsencrypt_route53_zone_id | length > 0) else 'http' }}"
+
+- name: Warn when using staging ACME directory
+  ansible.builtin.debug:
+    msg: >-
+      WARNING — Using Let's Encrypt STAGING directory.
+      Certificates will NOT be trusted by browsers.
+      Set letsencrypt_use_production: true for trusted certificates.
+    verbosity: 0
+  when: not (letsencrypt_use_production | bool)
+
+- name: Check for existing certificate
+  ansible.builtin.stat:
+    path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+  become: true
+  register: __letsencrypt_existing_cert
+
+- name: Read existing certificate issuer
+  community.crypto.x509_certificate_info:
+    path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+  become: true
+  register: __letsencrypt_existing_cert_info
+  when: __letsencrypt_existing_cert.stat.exists | default(false)
+
+- name: Fail if downgrading production certificate to staging
+  ansible.builtin.fail:
+    msg: >-
+      Existing certificate for {{ letsencrypt_domain }} was issued by a
+      production CA ({{ __letsencrypt_existing_cert_info.issuer.organizationName | default('unknown') }})
+      but letsencrypt_use_production is false (staging).
+      This would replace a trusted certificate with an untrusted one.
+      Set letsencrypt_use_production: true to keep production,
+      or letsencrypt_force_reissue: true to switch to staging intentionally.
+  when:
+    - __letsencrypt_existing_cert.stat.exists | default(false)
+    - __letsencrypt_existing_cert_info.issuer.organizationName | default('') is search("Let's Encrypt")
+    - __letsencrypt_existing_cert_info.issuer.organizationName | default('') is not search("STAGING")
+    - not (letsencrypt_use_production | bool)
+    - not (letsencrypt_force_reissue | bool)
 
 - name: Display certificate provisioning plan
   ansible.builtin.debug:
     msg: >-
       Provisioning Let's Encrypt certificate for {{ letsencrypt_domain }}
       using {{ letsencrypt_provider }} provider
-      with {{ __letsencrypt_method | upper }}-01 challenge.
+      with {{ __letsencrypt_method | upper }}-01 challenge
+      ({{ (letsencrypt_use_production | bool) | ternary('PRODUCTION', 'STAGING') }},
+      {{ letsencrypt_key_type | upper }}{{ (letsencrypt_key_type | lower == 'ecc') | ternary(' ' + letsencrypt_key_curve, '') }}).
     verbosity: 0
 
 - name: Provision certificate using {{ letsencrypt_provider }} provider
-  ansible.builtin.include_tasks: "{{ role_path }}/tasks/provider_{{ letsencrypt_provider }}.yml"
+  ansible.builtin.include_tasks: >-
+    {{ lookup('first_found', __letsencrypt_provider_params) }}
+  vars:
+    __letsencrypt_provider_params:
+      files:
+        - "provider_{{ letsencrypt_provider }}.yml"
+        - provider_unknown.yml
+      paths:
+        - "{{ role_path }}/tasks"
 
 - name: Deploy certificates to AAP services
   ansible.builtin.include_tasks: "{{ role_path }}/tasks/deploy_certs.yml"
