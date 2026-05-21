@@ -43,6 +43,7 @@ argument_specs:
 
       letsencrypt_acme_directory:
         type: str
+        default: https://acme-staging-v02.api.letsencrypt.org/directory
         description: >-
           ACME directory URL. Derived from letsencrypt_use_production by default.
           Override to use a custom ACME-compatible CA.
