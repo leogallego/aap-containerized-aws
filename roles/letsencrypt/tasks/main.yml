@@ -31,6 +31,35 @@
     verbosity: 0
   when: not (letsencrypt_use_production | bool)
 
+- name: Check for existing certificate
+  ansible.builtin.stat:
+    path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+  become: true
+  register: __letsencrypt_existing_cert
+
+- name: Read existing certificate issuer
+  community.crypto.x509_certificate_info:
+    path: "{{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
+  become: true
+  register: __letsencrypt_existing_cert_info
+  when: __letsencrypt_existing_cert.stat.exists | default(false)
+
+- name: Fail if downgrading production certificate to staging
+  ansible.builtin.fail:
+    msg: >-
+      Existing certificate for {{ letsencrypt_domain }} was issued by a
+      production CA ({{ __letsencrypt_existing_cert_info.issuer.organizationName | default('unknown') }})
+      but letsencrypt_use_production is false (staging).
+      This would replace a trusted certificate with an untrusted one.
+      Set letsencrypt_use_production: true to keep production,
+      or letsencrypt_force_reissue: true to switch to staging intentionally.
+  when:
+    - __letsencrypt_existing_cert.stat.exists | default(false)
+    - __letsencrypt_existing_cert_info.issuer.organizationName | default('') is search("Let's Encrypt")
+    - __letsencrypt_existing_cert_info.issuer.organizationName | default('') is not search("STAGING")
+    - not (letsencrypt_use_production | bool)
+    - not (letsencrypt_force_reissue | bool)
+
 - name: Display certificate provisioning plan
   ansible.builtin.debug:
     msg: >-

@@ -23,6 +23,9 @@ letsencrypt_acme_directory: >-
      | ternary('https://acme-v02.api.letsencrypt.org/directory',
                'https://acme-staging-v02.api.letsencrypt.org/directory') }}
 
+# Force certificate reissue even when downgrading from production to staging
+letsencrypt_force_reissue: false
+
 # Certificate key type: 'rsa' (default) or 'ecc'
 # ECC keys are faster and smaller but untested with all AAP components
 letsencrypt_key_type: rsa

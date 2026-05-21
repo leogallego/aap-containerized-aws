@@ -48,6 +48,14 @@ argument_specs:
           ACME directory URL. Derived from letsencrypt_use_production by default.
           Override to use a custom ACME-compatible CA.
 
+      letsencrypt_force_reissue:
+        type: bool
+        default: false
+        description: >-
+          Force certificate reissue even when an existing production
+          certificate would be replaced by a staging one. Use when
+          intentionally switching from production to staging.
+
       letsencrypt_key_type:
         type: str
         default: rsa
