@@ -179,7 +179,7 @@
     - __letsencrypt_method == 'http'
   block:
     - name: acme | Check if port 80 is in use
-      ansible.builtin.command: ss -tlnp sport = :80
+      ansible.builtin.command: /usr/sbin/ss -tlnp sport = :80
       become: true
       register: __letsencrypt_acme_port80
       changed_when: false
@@ -383,9 +383,17 @@
     backup: true
   become: true
 
+- name: acme | Remove legacy user-crontab entry
+  ansible.builtin.cron:
+    name: "letsencrypt-acme-renew"
+    user: root
+    state: absent
+  become: true
+
 - name: acme | Set up auto-renewal cron job
   ansible.builtin.cron:
     name: "letsencrypt-acme-renew"
+    cron_file: letsencrypt-renew
     minute: "30"
     hour: "2"
     job: >-
@@ -397,7 +405,7 @@
 # --- Renewal verification ---
 
 - name: acme | Verify cron job is registered
-  ansible.builtin.command: crontab -l -u root
+  ansible.builtin.command: cat /etc/cron.d/letsencrypt-renew
   become: true
   register: __letsencrypt_cron_check
   changed_when: false
@@ -405,7 +413,7 @@
 - name: acme | Fail if renewal cron job is missing
   ansible.builtin.fail:
     msg: >-
-      Renewal cron job 'letsencrypt-acme-renew' was not found in root's crontab.
+      Renewal cron job 'letsencrypt-acme-renew' was not found in /etc/cron.d/letsencrypt-renew.
       Auto-renewal will not work.
   when: "'letsencrypt-acme-renew' not in __letsencrypt_cron_check.stdout"
 
@@ -430,5 +438,5 @@
       - "Method: {{ __letsencrypt_method | upper }}-01 challenge"
       - "Cert: {{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/fullchain.pem"
       - "Key: {{ letsencrypt_cert_dir }}/{{ letsencrypt_domain }}/privkey.pem"
-      - "Auto-renewal: ansible-playbook via cron at 2:30 daily"
+      - "Auto-renewal: /etc/cron.d/letsencrypt-renew at 2:30 daily"
     verbosity: 0
