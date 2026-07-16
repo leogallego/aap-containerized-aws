@@ -98,7 +98,7 @@
         - letsencrypt_method == 'http'
       block:
         - name: Check if port 80 is in use
-          ansible.builtin.command: ss -tlnp sport = :80
+          ansible.builtin.command: /usr/sbin/ss -tlnp sport = :80
           register: __port80_check
           changed_when: false
 
