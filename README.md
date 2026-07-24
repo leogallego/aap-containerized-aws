@@ -1,6 +1,6 @@
 # Ansible Automation Platform - AWS Deployment
 
-Automated deployment of Ansible Automation Platform (AAP) on AWS infrastructure using Ansible playbooks.
+Automated deployment of Ansible Automation Platform (AAP) 2.6 containerized on AWS infrastructure using Ansible playbooks.
 
 ## Quick Start
 
@@ -37,18 +37,32 @@ ansible-playbook playbooks/deploy-aap-with-content.yml
 ## Project Structure
 
 ```
-aws-aap-container/
-├── env-vars.sh                      # Environment configuration
+aws-aap-containerized/
+├── env-vars.sample                          # Reference template (copy to env-vars.sh)
+├── extra-vars.yml                           # Variable definitions with env lookups
+├── requirements.yml                         # Ansible collection dependencies
+├── ansible.cfg                              # Ansible configuration
+├── inventory/
+│   └── hosts.yml.sample                     # Sample inventory file
 ├── playbooks/
-│   ├── deploy-aap.yml              # Complete deployment
+│   ├── deploy-aap.yml                       # Complete deployment
+│   ├── deploy-aap-with-content.yml          # Deployment + demo content
+│   ├── update-aap.yml                       # Update/upgrade existing instances
+│   ├── provision-letsencrypt.yml            # Add SSL to existing instances
 │   ├── aws/
-│   │   ├── create_infrastructure.yml
-│   │   └── teardown_infrastructure.yml
+│   │   ├── create_infrastructure.yml        # VPC, subnet, EC2, networking
+│   │   ├── create_infrastructure_gen_vm.yml # Generic RHEL VM provisioning
+│   │   └── teardown_infrastructure.yml      # Destroy all AWS resources
 │   └── aap/
-│       ├── install.yml
-│       ├── pre-install.yml
-│       └── post-install.yml
-└── files/                          # Place AAP bundle here
+│       ├── install.yml                      # AAP installation
+│       ├── install-content.yml              # Demo content installation
+│       └── tasks/
+│           ├── pre-install.yml              # Packages, bundle, inventory
+│           ├── pre-update.yml               # Update-specific preparation
+│           └── post-install.yml             # Service checks, API verification
+├── roles/
+│   └── letsencrypt/                         # Let's Encrypt SSL role
+└── files/                                   # AAP bundle and SSH keys (gitignored)
 ```
 
 ## Deployment Options
@@ -73,6 +87,23 @@ ansible-playbook playbooks/aap/install.yml
 
 # Install demo content (optional)
 ansible-playbook playbooks/aap/install-content.yml
+```
+
+### Update an Existing Instance
+
+For day-2 operations — bundle upgrades, SSL domain changes, component toggles — without re-creating infrastructure:
+
+```bash
+ansible-playbook -i inventory/<instance>-hosts.yml \
+  playbooks/update-aap.yml -e @extra-vars.yml
+```
+
+### Generic RHEL VM
+
+Provision a standalone RHEL VM on AWS (without AAP installation):
+
+```bash
+ansible-playbook playbooks/aws/create_infrastructure_gen_vm.yml
 ```
 
 ## Configuration
@@ -114,24 +145,39 @@ Edit `env-vars.sh` for basic settings:
 
 ```bash
 # Required - Red Hat registry credentials
-export INSTALLER_REGISTRY_USERNAME="your-username"
-export INSTALLER_REGISTRY_PASSWORD="your-password"
+export REDHAT_REGISTRY_USERNAME="your-redhat-username"
+export REDHAT_REGISTRY_PASSWORD="your-redhat-password"
+
+# Required - AAP admin
+export INSTALLER_ADMIN_PASSWORD="your-secure-admin-password"
+export INSTALLER_FQDN_HOSTNAME="aap.example.org"
 
 # Optional - AWS settings
 export AWS_REGION="us-east-1"
 export AWS_INSTANCE_TYPE="t3.xlarge"
 export INSTANCE_NAME="aap-containerized"
+export OWNER="your-username"                # For AWS resource tagging
 
-# Optional - AAP settings
-export INSTALLER_ADMIN_PW="ansible123"
+# AAP components (true/false)
 export AAP_INCLUDE_CONTROLLER="true"
 export AAP_INCLUDE_EDA_CONTROLLER="false"
 export AAP_INCLUDE_AUTOMATION_HUB="false"
 export AAP_INCLUDE_LIGHTSPEED="false"
 export AAP_INCLUDE_MCP_SERVER="false"
+```
 
-# Optional - Demo content
-export INSTALL_PRODUCT_DEMOS="true"
+### Database and Cache Configuration
+
+For production deployments, configure external database and cache:
+
+```bash
+export AAP_DATABASE_HOST="localhost"
+export AAP_DATABASE_NAME="awx"
+export AAP_DATABASE_USERNAME="awx"
+export AAP_DATABASE_PASSWORD="your-db-password"
+
+export AAP_CACHE_HOST="localhost"
+export AAP_CACHE_PASSWORD="your-cache-password"
 ```
 
 ### Ansible Lightspeed Configuration
@@ -152,7 +198,7 @@ export MCP_ALLOW_WRITE_OPERATIONS="true"  # Optional, default is read-only
 
 ### SSL/TLS with Let's Encrypt
 
-Provision trusted Let's Encrypt certificates automatically during deployment. Two challenge methods are supported:
+Provision trusted Let's Encrypt certificates automatically during deployment. Certificates default to **staging** (untrusted but safe for testing) — set `LETSENCRYPT_USE_PRODUCTION="true"` when ready for browser-trusted certificates.
 
 **DNS-01 via Route53 (recommended — fully automated):**
 
@@ -176,6 +222,16 @@ export INSTALLER_FQDN_HOSTNAME="aap.yourdomain.com"
 
 Without Route53, create the DNS A record manually after infrastructure provisioning (step-by-step deployment required). Port 80 must be reachable.
 
+**Advanced SSL options:**
+
+```bash
+# Use production Let's Encrypt (default: false = staging)
+export LETSENCRYPT_USE_PRODUCTION="true"
+
+# Use ECC keys instead of RSA (default: rsa)
+export LETSENCRYPT_KEY_TYPE="ecc"
+```
+
 **Add SSL to an existing instance:**
 
 ```bash
@@ -188,20 +244,33 @@ See the [letsencrypt role README](roles/letsencrypt/README.md) for full details 
 ### Optional Configuration
 
 ```bash
-# Demo content installation
-export INSTALL_PRODUCT_DEMOS="true"
+# SSH key (auto-generated if not specified)
+export SSH_KEY_NAME="my-existing-key"
 
-# Advanced options
-export SKIP_SYSTEM_UPDATE="true"    # Skip system updates
-export BUNDLE_INSTALL="true"        # Use bundle install
+# Custom VPC/subnet CIDR
+export VPC_CIDR="10.0.0.0/16"
+export SUBNET_CIDR="10.0.1.0/24"
+
+# Skip system updates during pre-installation
+export SKIP_SYSTEM_UPDATE="true"
+
+# Use online installation instead of bundle
+export BUNDLE_INSTALL="false"
+
+# Demo content customization
+export INSTALL_PRODUCT_DEMOS="true"
+export PRODUCT_DEMOS_REPO_URL="https://github.com/ansible/product-demos.git"
+export PRODUCT_DEMOS_REPO_VERSION="main"
 ```
+
+See `env-vars.sample` for the full list of configuration options with descriptions.
 
 ## Access
 
 After deployment:
 - **Web Interface:** `https://<public-ip>` (or `https://<fqdn>` if SSL is enabled)
 - **Username:** `admin`
-- **Password:** Value from `INSTALLER_ADMIN_PW`
+- **Password:** Value from `INSTALLER_ADMIN_PASSWORD`
 
 Public IP address is displayed in the completion message.
 
@@ -232,4 +301,4 @@ aws sts get-caller-identity
 ```bash
 ssh -i files/<instance-name>-key.pem ec2-user@<public-ip>
 sudo podman ps -a
-``` 
+```
