@@ -4,27 +4,52 @@ Automated deployment of Ansible Automation Platform (AAP) 2.6 containerized on A
 
 ## Quick Start
 
-```bash
-# 1. Configure credentials
-cp env-vars.sample env-vars.sh
-vim env-vars.sh                    # Update Red Hat registry credentials and AWS profile
-aws login                          # Authenticate with AWS (opens browser)
-source env-vars.sh
+1. **Install dependencies**
 
-# 2. Install dependencies
-ansible-galaxy collection install -r requirements.yml
+   ```bash
+   ansible-galaxy collection install -r requirements.yml
+   ```
 
-# 3. Add AAP setup bundle
-# Place your AAP bundle in files/ directory:
-# files/ansible-automation-platform-containerized-setup-bundle-*.tar.gz
+2. **Add the AAP setup bundle** — [download from Red Hat](https://access.redhat.com/downloads/content/480/) and place in `files/`:
 
-# 4. Deploy everything (choose one)
-# Basic deployment (AAP only)
-ansible-playbook playbooks/deploy-aap.yml
+   ```bash
+   cp ~/Downloads/ansible-automation-platform-containerized-setup-bundle-*.tar.gz files/
+   ```
 
-# Full deployment (AAP + demo content)
-ansible-playbook playbooks/deploy-aap-with-content.yml
-```
+3. **Configure environment** — copy the sample and edit the required values:
+
+   ```bash
+   cp env-vars.sample env-vars.sh
+   ```
+
+   Minimum required changes in `env-vars.sh`:
+
+   | Variable | What to set |
+   |---|---|
+   | `INSTANCE_NAME` | Unique name, e.g. `jdoe-aap` |
+   | `OWNER` | Your username (for AWS tagging) |
+   | `REDHAT_REGISTRY_USERNAME` | [Red Hat registry](https://access.redhat.com/RegistryAuthentication) username |
+   | `REDHAT_REGISTRY_PASSWORD` | Red Hat registry password |
+   | `INSTALLER_ADMIN_PASSWORD` | AAP admin password |
+
+   Everything else has sensible defaults (Controller only, `t3.xlarge`, `us-east-1`). Then authenticate and source:
+
+   ```bash
+   aws login              # opens browser
+   source env-vars.sh
+   ```
+
+4. **Deploy** (~30-40 minutes):
+
+   ```bash
+   # AAP only
+   ansible-playbook playbooks/deploy-aap.yml
+
+   # AAP + Product Demos content
+   ansible-playbook playbooks/deploy-aap-with-content.yml
+   ```
+
+After deployment, log in at `https://<public-ip>` with `admin` / your `INSTALLER_ADMIN_PASSWORD`. SSH: `ssh -i files/<instance-name>-key.pem ec2-user@<public-ip>`. To tear down: `ansible-playbook playbooks/aws/teardown_infrastructure.yml`.
 
 ## Prerequisites
 
